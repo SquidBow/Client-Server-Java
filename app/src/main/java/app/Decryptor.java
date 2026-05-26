@@ -1,24 +1,50 @@
-package practice1;
+package app;
 
 import java.nio.ByteBuffer;
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
 
-public class Decryptor {
+public class Decryptor implements IDecryptor, Runnable {
 
-    public class FullMessage {
+    private QueueManager queueManager;
 
-        int command_id;
-        int user_id;
-        String message;
+    public Decryptor(QueueManager queueManager) {
+        this.queueManager = queueManager;
     }
 
-    public FullMessage decryptMessage(byte[] bytes) {
-        if (bytes.length < 26) {
+    public void run() {
+        try {
+            while (true) {
+                byte[] in = queueManager.decrypt_queue.take();
+                decrypt(in);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    String decryptInnerMessage(byte[] bytes) {
+        try {
+            SecretKeySpec key = new SecretKeySpec(
+                "1234567890123456".getBytes(),
+                "AES"
+            );
+            Cipher cipher = Cipher.getInstance("AES");
+            cipher.init(Cipher.DECRYPT_MODE, key);
+
+            byte[] decrypted = cipher.doFinal(bytes);
+            return new String(decrypted);
+        } catch (Exception e) {
+            throw new RuntimeException();
+        }
+    }
+
+    public void decrypt(byte[] message) {
+        if (message.length < 26) {
             throw new IllegalArgumentException("Unable to decrypt message");
         }
 
-        ByteBuffer array = ByteBuffer.wrap(bytes);
+        ByteBuffer array = ByteBuffer.wrap(message);
 
         byte magic_number = array.get();
         if (magic_number != 0x13) {
@@ -33,7 +59,7 @@ public class Decryptor {
 
         int message_length = array.getInt();
 
-        if (bytes.length < message_length + 14 + 4) {
+        if (message.length < message_length + 14 + 4) {
             throw new IllegalArgumentException("Unable to decrypt message");
         }
 
@@ -48,7 +74,7 @@ public class Decryptor {
             throw new IllegalArgumentException("Unable to decrypt message");
         }
 
-        FullMessage full_message = new FullMessage();
+        Message full_message = new Message();
         full_message.command_id = array.getInt();
         full_message.user_id = array.getInt();
 
@@ -68,22 +94,12 @@ public class Decryptor {
             throw new IllegalArgumentException("Unable to decrypt message");
         }
 
-        return full_message;
-    }
-
-    String decryptInnerMessage(byte[] bytes) {
         try {
-            SecretKeySpec key = new SecretKeySpec(
-                "1234567890123456".getBytes(),
-                "AES"
-            );
-            Cipher cipher = Cipher.getInstance("AES");
-            cipher.init(Cipher.DECRYPT_MODE, key);
-
-            byte[] decrypted = cipher.doFinal(bytes);
-            return new String(decrypted);
-        } catch (Exception e) {
-            throw new RuntimeException();
+            queueManager.processor_queue.put(full_message);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
+
+        //        return full_message;
     }
 }

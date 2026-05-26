@@ -1,10 +1,11 @@
-package practice1;
+package app;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 public class UserDao {
+
     private final List<User> db = new ArrayList<>();
     private int idAutoIncrement = 0;
 
@@ -15,7 +16,8 @@ public class UserDao {
     }
 
     public Optional<User> getById(int id) {
-        return db.stream()
+        return db
+            .stream()
             .filter(u -> u.getId() == id)
             .findFirst();
     }

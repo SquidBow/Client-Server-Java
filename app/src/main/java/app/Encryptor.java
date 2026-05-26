@@ -1,13 +1,33 @@
-package practice1;
+package app;
 
 import java.nio.ByteBuffer;
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
 
-public class Encryptor {
+public class Encryptor implements IEncryptor, Runnable {
 
-    public byte[] encryptMessage(String entry_message) {
-        byte[] message_bytes = encryptInnerMessage(entry_message);
+    private QueueManager queueManager;
+
+    public Encryptor() {}
+
+    public Encryptor(QueueManager queueManager) {
+        this.queueManager = queueManager;
+    }
+
+    public void run() {
+        try {
+            while (true) {
+                Message in = queueManager.encrypt_queue.take();
+                byte[] encrypted = encrypt(in);
+                queueManager.sender_queue.put(encrypted);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    public byte[] encrypt(Message message) {
+        byte[] message_bytes = encryptInnerMessage(message.message);
 
         ByteBuffer byte_buffer = ByteBuffer.allocate(
             1 + 1 + 8 + 4 * 3 + 2 * 2 + message_bytes.length
@@ -23,7 +43,10 @@ public class Encryptor {
         byte_buffer.get(0, copy, 0, copy.length);
         byte_buffer.putShort(Crc16.calculateCrc(copy));
 
-        byte_buffer.putInt(167253).putInt(69).put(message_bytes);
+        byte_buffer
+            .putInt(message.command_id)
+            .putInt(message.user_id)
+            .put(message_bytes);
 
         byte[] sec_holder = new byte[message_bytes.length + 8];
         byte_buffer.get(16, sec_holder, 0, sec_holder.length);
