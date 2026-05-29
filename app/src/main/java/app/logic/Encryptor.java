@@ -1,5 +1,7 @@
-package app;
+package app.logic;
 
+import app.logic.Context;
+import app.logic.LogicTuple;
 import java.nio.ByteBuffer;
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
@@ -7,6 +9,7 @@ import javax.crypto.spec.SecretKeySpec;
 public class Encryptor implements IEncryptor, Runnable {
 
     private QueueManager queueManager;
+    private Context context;
 
     public Encryptor() {}
 
@@ -17,9 +20,12 @@ public class Encryptor implements IEncryptor, Runnable {
     public void run() {
         try {
             while (true) {
-                Message in = queueManager.encrypt_queue.take();
-                byte[] encrypted = encrypt(in);
-                queueManager.sender_queue.put(encrypted);
+                LogicTuple<Message> in = queueManager.encrypt_queue.take();
+                this.context = in.context;
+                byte[] encrypted = encrypt(in.data);
+                queueManager.sender_queue.put(
+                    new LogicTuple<>(encrypted, context)
+                );
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

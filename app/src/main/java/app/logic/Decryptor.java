@@ -1,5 +1,7 @@
-package app;
+package app.logic;
 
+import app.logic.Context;
+import app.logic.LogicTuple;
 import java.nio.ByteBuffer;
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
@@ -7,6 +9,7 @@ import javax.crypto.spec.SecretKeySpec;
 public class Decryptor implements IDecryptor, Runnable {
 
     private QueueManager queueManager;
+    private Context context;
 
     public Decryptor(QueueManager queueManager) {
         this.queueManager = queueManager;
@@ -15,8 +18,9 @@ public class Decryptor implements IDecryptor, Runnable {
     public void run() {
         try {
             while (true) {
-                byte[] in = queueManager.decrypt_queue.take();
-                decrypt(in);
+                LogicTuple<byte[]> in = queueManager.decrypt_queue.take();
+                context = in.context;
+                decrypt(in.data);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -95,7 +99,10 @@ public class Decryptor implements IDecryptor, Runnable {
         }
 
         try {
-            queueManager.processor_queue.put(full_message);
+            queueManager.processor_queue.put(
+                // That was not full message lol
+                new LogicTuple<>(full_message, context)
+            );
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }

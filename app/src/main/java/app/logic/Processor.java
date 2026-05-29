@@ -1,5 +1,7 @@
-package app;
+package app.logic;
 
+import app.logic.Context;
+import app.logic.LogicTuple;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -8,6 +10,7 @@ public class Processor implements IProcessor, Runnable {
 
     private QueueManager queueManager;
     private Storage storage;
+    private Context context;
 
     public Processor(QueueManager queueManager, Storage storage) {
         this.queueManager = queueManager;
@@ -17,9 +20,11 @@ public class Processor implements IProcessor, Runnable {
     public void run() {
         try {
             while (true) {
-                Message in = queueManager.processor_queue.take();
+                LogicTuple<Message> in = queueManager.processor_queue.take();
+                context = in.context;
+
                 try {
-                    process(in);
+                    process(in.data);
                 } catch (Exception e) {}
             }
         } catch (InterruptedException e) {
@@ -124,7 +129,7 @@ public class Processor implements IProcessor, Runnable {
         );
 
         try {
-            queueManager.encrypt_queue.put(message2);
+            queueManager.encrypt_queue.put(new LogicTuple<>(message2, context));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }

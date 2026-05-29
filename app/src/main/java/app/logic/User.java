@@ -1,4 +1,4 @@
-package app;
+package app.logic;
 
 public class User {
 
@@ -26,5 +26,4 @@ public class User {
     public String getEmail() {
         return email;
     }
-
 }

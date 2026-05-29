@@ -1,11 +1,14 @@
 package app;
 
+import app.logic.User;
+import app.logic.UserDao;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class UserDaoTest {
+
     private final UserDao sut = new UserDao();
 
     @BeforeEach
@@ -23,15 +26,12 @@ class UserDaoTest {
     void shouldAddUserToDb() {
         int countBefore = sut.count();
         sut.add(new User("New User", "new.user@email.com"));
-
-        Assertions.assertThat(sut.count())
-            .isEqualTo(countBefore + 1);
+        Assertions.assertThat(sut.count()).isEqualTo(countBefore + 1);
     }
 
     @Test
     void shouldGetUserById() {
         int id = sut.add(new User("My New User", "my.new.user@email.com"));
-
         Assertions.assertThat(sut.getById(id))
             .isPresent()
             .get()

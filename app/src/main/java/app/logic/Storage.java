@@ -1,4 +1,4 @@
-package app;
+package app.logic;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
