@@ -7,8 +7,12 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class StoreServerTCP extends Thread {
+
+    public static int MAX_THREADS = 1;
+    private final AtomicInteger THREAD_COUNT = new AtomicInteger(0);
 
     QueueManager queue;
     int port;
@@ -21,6 +25,13 @@ public class StoreServerTCP extends Thread {
             while (true) {
                 try {
                     LogicTuple<byte[]> send = queue.sender_queue.take();
+
+                    if (send.context.address != null) {
+                        queue.sender_queue.put(send);
+                        Thread.sleep(10);
+                        continue;
+                    }
+
                     send.context.socket.getOutputStream().write(send.data);
                 } catch (InterruptedException e) {
                 } catch (IOException e) {
@@ -36,12 +47,16 @@ public class StoreServerTCP extends Thread {
             while (true) {
                 Socket socket = s.accept();
 
-                //Think now this will create infinite threads for messages but whatever
+                while (THREAD_COUNT.get() >= MAX_THREADS) {
+                    Thread.sleep(10);
+                }
+
+                THREAD_COUNT.incrementAndGet();
                 new Thread(() -> {
                     execute(socket);
                 }).start();
             }
-        } catch (IOException e) {}
+        } catch (InterruptedException | IOException e) {}
     }
 
     private void execute(Socket socket) throws RuntimeException {
@@ -53,22 +68,24 @@ public class StoreServerTCP extends Thread {
             byte[] buffer = new byte[18];
 
             while (true) {
-                int bytes_read = in.readNBytes(buffer, 0, 18);
+                int bytes_read = in.readNBytes(buffer, 0, 16);
 
                 if (bytes_read < 16) break;
 
-                int length = ByteBuffer.wrap(buffer).getInt(10);
+                int length = ByteBuffer.wrap(buffer).getInt(10) + 2;
 
                 byte[] smth1 = in.readNBytes(length);
-                byte[] ret = new byte[18 + length];
+                byte[] ret = new byte[16 + length];
 
-                System.arraycopy(buffer, 0, ret, 0, 18);
-                System.arraycopy(smth1, 0, ret, 18, length);
+                System.arraycopy(buffer, 0, ret, 0, 16);
+                System.arraycopy(smth1, 0, ret, 16, length);
                 queue.decrypt_queue.add(new LogicTuple<byte[]>(ret, context));
             }
         } catch (IOException e) {
             throw new RuntimeException("Can't read from client", e);
         } finally {
+            THREAD_COUNT.decrementAndGet();
+
             try {
                 socket.close();
             } catch (IOException e) {}

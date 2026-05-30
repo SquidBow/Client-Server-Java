@@ -5,10 +5,12 @@ import app.logic.LogicTuple;
 import app.logic.QueueManager;
 import java.io.IOException;
 import java.net.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class StoreServerUDP extends Thread {
 
-    //TODO MAKE SO IT IS NOT INFINITE THREADS, MAKE A LIMIT CAUSE RN THE NEW THREAD GOES INFINITELY FOR RESPONCES
+    public static int MAX_THREADS = 5;
+    private final AtomicInteger THREAD_COUNT = new AtomicInteger(0);
 
     QueueManager queue;
     int port;
@@ -30,7 +32,6 @@ public class StoreServerUDP extends Thread {
             while (true) {
                 try {
                     LogicTuple<byte[]> send = queue.sender_queue.take();
-
                     //Check if TCP responce cause AI said it is important
                     if (send.context.address == null) {
                         queue.sender_queue.put(send);
@@ -47,9 +48,7 @@ public class StoreServerUDP extends Thread {
                             send.context.port
                         )
                     );
-                } catch (InterruptedException e) {
-                } catch (IOException e) {
-                }
+                } catch (InterruptedException | IOException e) {}
             }
         }).start();
 
@@ -57,33 +56,39 @@ public class StoreServerUDP extends Thread {
     }
 
     public void run() {
-        new Thread(() -> execute());
-    }
-
-    private void execute() {
-        try {
+        while (true) {
             byte[] buffer = new byte[1024];
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
 
-            while (true) {
+            try {
                 socket.receive(packet);
+                while (THREAD_COUNT.get() >= MAX_THREADS) {
+                    Thread.sleep(10);
+                }
+            } catch (InterruptedException | IOException e) {}
 
-                Context context = new Context(
-                    packet.getAddress(),
-                    packet.getPort()
-                );
+            THREAD_COUNT.getAndIncrement();
+            new Thread(() -> execute(packet)).start();
+        }
+    }
 
-                int length = packet.getLength();
-                byte[] message = new byte[length];
-                System.arraycopy(packet.getData(), 0, message, 0, length);
-                //Cant see the keys I am typing with cause so dark already
+    private void execute(DatagramPacket packet) {
+        try {
+            Context context = new Context(
+                packet.getAddress(),
+                packet.getPort()
+            );
 
-                queue.decrypt_queue.put(
-                    new LogicTuple<byte[]>(message, context)
-                );
-            }
-        } catch (IOException | InterruptedException e) {
+            int length = packet.getLength();
+            byte[] message = new byte[length];
+            System.arraycopy(packet.getData(), 0, message, 0, length);
+            //Cant see the keys I am typing with cause so dark already
+
+            queue.decrypt_queue.put(new LogicTuple<byte[]>(message, context));
+        } catch (InterruptedException e) {
             System.out.println("Error while reading/writing socket");
+        } finally {
+            THREAD_COUNT.decrementAndGet();
         }
     }
 }

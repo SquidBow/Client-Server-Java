@@ -11,9 +11,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class StoreClientTCP extends Thread {
 
-    static final int MAX_THREADS = 5;
-    private static final AtomicInteger THREAD_COUNT = new AtomicInteger(0);
-    private static int id = 0;
+    public static int MAX_THREADS = 1;
+    private final AtomicInteger THREAD_COUNT = new AtomicInteger(0);
+    private AtomicInteger id = new AtomicInteger(0);
 
     private final int port;
 
@@ -29,6 +29,7 @@ public class StoreClientTCP extends Thread {
 
             while (true) {
                 if (THREAD_COUNT.get() < MAX_THREADS) {
+                    THREAD_COUNT.incrementAndGet();
                     new Thread(() -> sendMessage(addr)).start();
                 }
 
@@ -40,14 +41,28 @@ public class StoreClientTCP extends Thread {
     }
 
     private void sendMessage(InetAddress addr) {
-        id++;
-        THREAD_COUNT.incrementAndGet();
-        try (Socket socket = new Socket(addr, port)) {
+        Socket socket = null;
+
+        while (socket == null) {
+            try {
+                socket = new Socket(addr, port);
+            } catch (IOException e) {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e2) {}
+            }
+        }
+
+        try {
             OutputStream out = socket.getOutputStream();
             InputStream in = socket.getInputStream();
 
             for (int i = 0; i < 5; i++) {
-                Message msg = new Message(1, id, "item_" + i);
+                Message msg = new Message(
+                    3,
+                    id.getAndIncrement(),
+                    "item_" + i + ":" + i
+                );
 
                 Encryptor encryptor = new Encryptor();
 
@@ -59,13 +74,17 @@ public class StoreClientTCP extends Thread {
                 int read = in.readNBytes(header, 0, 16);
                 if (read < 16) return;
 
-                int length = ByteBuffer.wrap(header).getInt(10);
+                int length = ByteBuffer.wrap(header).getInt(10) + 2;
                 byte[] body = in.readNBytes(length);
             }
 
             // System.out.println("Client " + id + " received response)
         } catch (IOException e) {
         } finally {
+            try {
+                socket.close();
+            } catch (IOException e) {}
+
             THREAD_COUNT.decrementAndGet();
         }
     }

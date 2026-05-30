@@ -43,11 +43,15 @@ public class Processor implements IProcessor, Runnable {
             // Get the item cause, I mean, that is what you sometimes have to do, yeah, imagine, crazy, that's just incredible, truly an unforgettable experience
             int quantity = storage.item_table.getOrDefault(message.message, -1);
 
-            if (quantity == -1) throw new IllegalArgumentException(
-                "Item doesn't exist."
-            );
+            // if (quantity == -1) throw new IllegalArgumentException(
+            //     "Item doesn't exist."
+            // );
 
-            message2.message = String.valueOf(quantity);
+            if (quantity == -1) {
+                message2.message = "This item doesn't exist!";
+            } else {
+                message2.message = String.valueOf(quantity);
+            }
         } else if (message.command_id == 2) {
             String[] command_arguments = message.message.split(":");
 

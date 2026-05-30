@@ -1,4 +1,4 @@
-package app;
+package app.logic;
 
 public class Calc {
 
