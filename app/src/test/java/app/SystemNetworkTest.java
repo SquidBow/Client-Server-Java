@@ -1,24 +1,21 @@
 package app;
 
+import app.helpers.Message;
 import app.logic.*;
 import app.network.tcp.StoreServerTCP;
-import app.network.tcp.StoreClientTCP;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
-import java.util.ArrayList;
-import java.util.List;
 
 public class SystemNetworkTest {
 
     @Test
     void shouldHandleTcpAddAndGet() throws Exception {
         QueueManager queueManager = new QueueManager();
-        Storage storage = new Storage();
-        int port = 9001; // Use a different port to avoid conflicts
+        int port = 9001;
 
         // Server components
         Decryptor decryptor = new Decryptor(queueManager);
-        Processor processor = new Processor(queueManager, storage);
+        Processor processor = new Processor(queueManager, "storage.db");
         Encryptor encryptor = new Encryptor(queueManager);
         StoreServerTCP server = new StoreServerTCP(queueManager, port);
 
@@ -31,25 +28,44 @@ public class SystemNetworkTest {
 
         try {
             SimpleClient client = new SimpleClient(port);
-            Decryptor testDecryptor = new Decryptor(new QueueManager()); // Just for decrypt helper
 
             // 1. Add item "test_apple:50" (command_id 3)
-            Message addMsg = new Message(3, 123, "test_apple:50");
-            client.send(addMsg); // Server will process and put response in queue
-            
+            java.util.Map<String, String> values = new java.util.HashMap<>();
+            values.put("upc", "test_apple");
+            values.put("name", "Apple");
+            values.put("quantity", "50");
+
+            String insertPayload = TestProtocolHelper.formatInsert(
+                "Product",
+                "upc",
+                values
+            );
+            Message addMsg = new Message(3, 123, insertPayload);
+            client.send(addMsg);
+
             Thread.sleep(500); // Wait for processing
 
             // 2. Get item "test_apple" (command_id 1)
-            Message getMsg = new Message(1, 123, "test_apple");
+            String searchPayload = TestProtocolHelper.formatSearch(
+                "Product",
+                new String[] { " and upc = 'test_apple'" },
+                10,
+                0,
+                null,
+                true
+            );
+            Message getMsg = new Message(1, 123, searchPayload);
             byte[] responsePacket = client.send(getMsg);
 
             // 3. Manually verify response from server
-            // Since our SimpleClient returns the full packet, we can use Decryptor to peek at it
-            // However, Decryptor puts it in a queue. Let's just check storage directly first to be sure
-            Assertions.assertThat(storage.item_table.get("test_apple")).isEqualTo(50);
-            
-            System.out.println("Storage verification passed: test_apple has 50 items");
+            String responseStr = TestProtocolHelper.decryptFullPacket(
+                responsePacket
+            );
+            Assertions.assertThat(responseStr).isEqualTo("50");
 
+            System.out.println(
+                "Storage verification passed: test_apple has 50 items"
+            );
         } finally {
             dThread.interrupt();
             pThread.interrupt();

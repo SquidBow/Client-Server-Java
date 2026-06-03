@@ -1,15 +1,17 @@
 package app.logic;
 
-import app.logic.Context;
-import app.logic.LogicTuple;
+import app.helpers.Crc16;
+import app.helpers.Message;
+import app.helpers.NetContext;
+import app.helpers.Tuple;
 import java.nio.ByteBuffer;
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
 
-public class Decryptor implements IDecryptor, Runnable {
+public class Decryptor implements app.interfaces.IDecryptor, Runnable {
 
     private QueueManager queueManager;
-    private Context context;
+    private NetContext context;
 
     public Decryptor(QueueManager queueManager) {
         this.queueManager = queueManager;
@@ -18,9 +20,13 @@ public class Decryptor implements IDecryptor, Runnable {
     public void run() {
         try {
             while (true) {
-                LogicTuple<byte[]> in = queueManager.decrypt_queue.take();
+                Tuple<byte[]> in = queueManager.decrypt_queue.take();
                 context = in.context;
-                decrypt(in.data);
+                try {
+                    decrypt(in.data);
+                } catch (Exception e) {
+                    System.err.println("Decryption failed: " + e.getMessage());
+                }
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -101,7 +107,7 @@ public class Decryptor implements IDecryptor, Runnable {
         try {
             queueManager.processor_queue.put(
                 // That was not full message lol
-                new LogicTuple<>(full_message, context)
+                new Tuple<Message>(full_message, context)
             );
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

@@ -1,18 +1,19 @@
 package app.network.tcp;
 
-import app.logic.Context;
-import app.logic.LogicTuple;
+import app.helpers.*;
 import app.logic.QueueManager;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class StoreServerTCP extends Thread {
 
     public static int MAX_THREADS = 1;
     private final AtomicInteger THREAD_COUNT = new AtomicInteger(0);
+    private Semaphore semaphore = new Semaphore(MAX_THREADS);
 
     QueueManager queue;
     int port;
@@ -24,7 +25,7 @@ public class StoreServerTCP extends Thread {
         new Thread(() -> {
             while (true) {
                 try {
-                    LogicTuple<byte[]> send = queue.sender_queue.take();
+                    Tuple<byte[]> send = queue.sender_queue.take();
 
                     if (send.context.address != null) {
                         queue.sender_queue.put(send);
@@ -47,13 +48,23 @@ public class StoreServerTCP extends Thread {
             while (true) {
                 Socket socket = s.accept();
 
-                while (THREAD_COUNT.get() >= MAX_THREADS) {
-                    Thread.sleep(10);
-                }
+                semaphore.acquire();
 
-                THREAD_COUNT.incrementAndGet();
+                // while (THREAD_COUNT.get() >= MAX_THREADS) {
+                //     Thread.sleep(10);
+                // }
+
+                // THREAD_COUNT.incrementAndGet();
                 new Thread(() -> {
-                    execute(socket);
+                    try {
+                        execute(socket);
+                    } finally {
+                        semaphore.release();
+
+                        try {
+                            socket.close();
+                        } catch (IOException e) {}
+                    }
                 }).start();
             }
         } catch (InterruptedException | IOException e) {}
@@ -63,7 +74,7 @@ public class StoreServerTCP extends Thread {
         try {
             InputStream in = socket.getInputStream();
             // OutputStream out = socket.getOutputStream();
-            Context context = new Context(socket);
+            NetContext context = new NetContext(socket);
 
             byte[] buffer = new byte[18];
 
@@ -79,12 +90,12 @@ public class StoreServerTCP extends Thread {
 
                 System.arraycopy(buffer, 0, ret, 0, 16);
                 System.arraycopy(smth1, 0, ret, 16, length);
-                queue.decrypt_queue.add(new LogicTuple<byte[]>(ret, context));
+                queue.decrypt_queue.add(new Tuple<byte[]>(ret, context));
             }
         } catch (IOException e) {
             throw new RuntimeException("Can't read from client", e);
         } finally {
-            THREAD_COUNT.decrementAndGet();
+            // THREAD_COUNT.decrementAndGet();
 
             try {
                 socket.close();

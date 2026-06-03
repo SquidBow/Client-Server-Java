@@ -9,13 +9,11 @@ public class Main {
 
     public static void main(String[] args) {
         QueueManager queueManager = new QueueManager();
-        Storage storage = new Storage();
 
         // int numReceivers = 2;
         int numDecryptors = 2;
         int numProcessors = 4;
         int numEncryptors = 3;
-        int numSenders = 5;
 
         List<Thread> threads = new ArrayList<>();
 
@@ -27,7 +25,7 @@ public class Main {
             new Thread(new Decryptor(queueManager))
         );
         for (int i = 0; i < numProcessors; i++) threads.add(
-            new Thread(new Processor(queueManager, storage))
+            new Thread(new Processor(queueManager, "storage.db"))
         );
         for (int i = 0; i < numEncryptors; i++) threads.add(
             new Thread(new Encryptor(queueManager))

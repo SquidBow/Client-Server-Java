@@ -1,16 +1,18 @@
 package app.network.udp;
 
-import app.logic.Context;
-import app.logic.LogicTuple;
+import app.helpers.NetContext;
+import app.helpers.Tuple;
 import app.logic.QueueManager;
 import java.io.IOException;
 import java.net.*;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class StoreServerUDP extends Thread {
 
     public static int MAX_THREADS = 5;
-    private final AtomicInteger THREAD_COUNT = new AtomicInteger(0);
+    // private final AtomicInteger THREAD_COUNT = new AtomicInteger(0);
+    private Semaphore semaphore = new Semaphore(MAX_THREADS);
 
     QueueManager queue;
     int port;
@@ -31,7 +33,7 @@ public class StoreServerUDP extends Thread {
         new Thread(() -> {
             while (true) {
                 try {
-                    LogicTuple<byte[]> send = queue.sender_queue.take();
+                    Tuple<byte[]> send = queue.sender_queue.take();
                     //Check if TCP responce cause AI said it is important
                     if (send.context.address == null) {
                         queue.sender_queue.put(send);
@@ -62,19 +64,28 @@ public class StoreServerUDP extends Thread {
 
             try {
                 socket.receive(packet);
-                while (THREAD_COUNT.get() >= MAX_THREADS) {
-                    Thread.sleep(10);
-                }
+
+                semaphore.acquire();
+
+                // while (THREAD_COUNT.get() >= MAX_THREADS) {
+                //     Thread.sleep(10);
+                // }
             } catch (InterruptedException | IOException e) {}
 
-            THREAD_COUNT.getAndIncrement();
-            new Thread(() -> execute(packet)).start();
+            // THREAD_COUNT.getAndIncrement();
+            new Thread(() -> {
+                try {
+                    execute(packet);
+                } finally {
+                    semaphore.release();
+                }
+            }).start();
         }
     }
 
     private void execute(DatagramPacket packet) {
         try {
-            Context context = new Context(
+            NetContext context = new NetContext(
                 packet.getAddress(),
                 packet.getPort()
             );
@@ -84,11 +95,11 @@ public class StoreServerUDP extends Thread {
             System.arraycopy(packet.getData(), 0, message, 0, length);
             //Cant see the keys I am typing with cause so dark already
 
-            queue.decrypt_queue.put(new LogicTuple<byte[]>(message, context));
+            queue.decrypt_queue.put(new Tuple<byte[]>(message, context));
         } catch (InterruptedException e) {
             System.out.println("Error while reading/writing socket");
         } finally {
-            THREAD_COUNT.decrementAndGet();
+            // THREAD_COUNT.decrementAndGet();
         }
     }
 }

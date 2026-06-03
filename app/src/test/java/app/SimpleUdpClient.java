@@ -1,12 +1,12 @@
 package app;
 
+import app.helpers.*;
 import app.logic.Encryptor;
-import app.logic.Message;
 import java.io.IOException;
 import java.net.*;
-import java.nio.ByteBuffer;
 
 public class SimpleUdpClient {
+
     private final int port;
     private final InetAddress address;
 
@@ -30,8 +30,11 @@ public class SimpleUdpClient {
             socket.send(sendPacket);
 
             byte[] buffer = new byte[1024];
-            DatagramPacket receivePacket = new DatagramPacket(buffer, buffer.length);
-            
+            DatagramPacket receivePacket = new DatagramPacket(
+                buffer,
+                buffer.length
+            );
+
             socket.setSoTimeout(2000);
             socket.receive(receivePacket);
 

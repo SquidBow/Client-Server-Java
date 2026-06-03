@@ -1,15 +1,17 @@
 package app.logic;
 
-import app.logic.Context;
-import app.logic.LogicTuple;
+import app.helpers.Crc16;
+import app.helpers.Message;
+import app.helpers.NetContext;
+import app.helpers.Tuple;
 import java.nio.ByteBuffer;
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
 
-public class Encryptor implements IEncryptor, Runnable {
+public class Encryptor implements app.interfaces.IEncryptor, Runnable {
 
     private QueueManager queueManager;
-    private Context context;
+    private NetContext context;
 
     public Encryptor() {}
 
@@ -20,12 +22,10 @@ public class Encryptor implements IEncryptor, Runnable {
     public void run() {
         try {
             while (true) {
-                LogicTuple<Message> in = queueManager.encrypt_queue.take();
+                Tuple<Message> in = queueManager.encrypt_queue.take();
                 this.context = in.context;
                 byte[] encrypted = encrypt(in.data);
-                queueManager.sender_queue.put(
-                    new LogicTuple<>(encrypted, context)
-                );
+                queueManager.sender_queue.put(new Tuple<>(encrypted, context));
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

@@ -25,7 +25,7 @@ public class SystemResilienceTest {
         // Now start the server
         StoreServerTCP server = new StoreServerTCP(queueManager, port);
         Decryptor decryptor = new Decryptor(queueManager);
-        Processor processor = new Processor(queueManager, storage);
+        Processor processor = new Processor(queueManager, "storage.db");
         Encryptor encryptor = new Encryptor(queueManager);
 
         Thread dThread = new Thread(decryptor);
@@ -38,8 +38,8 @@ public class SystemResilienceTest {
         try {
             Thread.sleep(6000); // Give client time to reconnect and send items
 
-            // If reconnection works, item_1 should eventually exist
-            Assertions.assertThat(storage.item_table).isNotEmpty();
+            // If reconnection works, item_1 should eventually exist in DB
+            Assertions.assertThat(checkDatabaseHasData("item_0")).isTrue();
             System.out.println("TCP Reconnection test passed!");
         } finally {
             dThread.interrupt();
@@ -50,10 +50,25 @@ public class SystemResilienceTest {
         }
     }
 
+    private boolean checkDatabaseHasData(String upc) {
+        try (
+            java.sql.Connection conn = java.sql.DriverManager.getConnection(
+                "jdbc:sqlite:storage.db"
+            );
+            java.sql.Statement stmt = conn.createStatement()
+        ) {
+            java.sql.ResultSet rs = stmt.executeQuery(
+                "SELECT * FROM Product WHERE upc = '" + upc + "'"
+            );
+            return rs.next();
+        } catch (java.sql.SQLException e) {
+            return false;
+        }
+    }
+
     @Test
     void shouldVerifyUdpRetries() throws Exception {
         QueueManager queueManager = new QueueManager();
-        Storage storage = new Storage();
         int port = 9004;
 
         // Start UDP Client. It will try to send and fail (no server).
@@ -64,7 +79,7 @@ public class SystemResilienceTest {
         // Now start the server
         StoreServerUDP server = new StoreServerUDP(queueManager, port);
         Decryptor decryptor = new Decryptor(queueManager);
-        Processor processor = new Processor(queueManager, storage);
+        Processor processor = new Processor(queueManager, "storage.db");
         Encryptor encryptor = new Encryptor(queueManager);
 
         Thread dThread = new Thread(decryptor);
@@ -78,7 +93,7 @@ public class SystemResilienceTest {
             Thread.sleep(6000); // Wait for the client's next retry to hit the new server
 
             // If retry works, storage should eventually have items
-            Assertions.assertThat(storage.item_table).isNotEmpty();
+            Assertions.assertThat(checkDatabaseHasData("item_0")).isTrue();
             System.out.println("UDP Retry test passed!");
         } finally {
             dThread.interrupt();

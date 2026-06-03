@@ -1,5 +1,6 @@
 package app.network.tcp;
 
+import app.helpers.Message;
 import app.logic.*;
 import java.io.IOException;
 import java.io.InputStream;
@@ -12,7 +13,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class StoreClientTCP extends Thread {
 
     public static int MAX_THREADS = 1;
-    private final AtomicInteger THREAD_COUNT = new AtomicInteger(0);
     private AtomicInteger id = new AtomicInteger(0);
 
     private final int port;
@@ -25,19 +25,12 @@ public class StoreClientTCP extends Thread {
 
     public void run() {
         try {
-            InetAddress addr = InetAddress.getByName(null);
+            InetAddress addr = InetAddress.getByName("localhost");
 
-            while (true) {
-                if (THREAD_COUNT.get() < MAX_THREADS) {
-                    THREAD_COUNT.incrementAndGet();
-                    new Thread(() -> sendMessage(addr)).start();
-                }
-
-                Thread.sleep(100);
+            for (int i = 0; i < MAX_THREADS; i++) {
+                new Thread(() -> sendMessage(addr)).start();
             }
-        } catch (IOException e) {
-        } catch (InterruptedException e) {
-        }
+        } catch (IOException e) {}
     }
 
     private void sendMessage(InetAddress addr) {
@@ -61,7 +54,12 @@ public class StoreClientTCP extends Thread {
                 Message msg = new Message(
                     3,
                     id.getAndIncrement(),
-                    "item_" + i + ":" + i
+                    "Product;upc;upc:item_" +
+                        i +
+                        ";name:Item_" +
+                        i +
+                        ";quantity:" +
+                        i
                 );
 
                 Encryptor encryptor = new Encryptor();
@@ -85,7 +83,7 @@ public class StoreClientTCP extends Thread {
                 socket.close();
             } catch (IOException e) {}
 
-            THREAD_COUNT.decrementAndGet();
+            // THREAD_COUNT.decrementAndGet();
         }
     }
 }

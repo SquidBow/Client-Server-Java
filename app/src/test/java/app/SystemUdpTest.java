@@ -1,5 +1,6 @@
 package app;
 
+import app.helpers.Message;
 import app.logic.*;
 import app.network.udp.StoreServerUDP;
 import org.assertj.core.api.Assertions;
@@ -14,7 +15,7 @@ public class SystemUdpTest {
         int port = 9002;
 
         Decryptor decryptor = new Decryptor(queueManager);
-        Processor processor = new Processor(queueManager, storage);
+        Processor processor = new Processor(queueManager, "storage.db");
         Encryptor encryptor = new Encryptor(queueManager);
         StoreServerUDP server = new StoreServerUDP(queueManager, port);
 
@@ -29,15 +30,25 @@ public class SystemUdpTest {
             SimpleUdpClient client = new SimpleUdpClient(port);
 
             // 1. Add item "banana:30" (command_id 3)
-            Message addMsg = new Message(3, 456, "banana:30");
+            java.util.Map<String, String> values = new java.util.HashMap<>();
+            values.put("upc", "banana");
+            values.put("name", "Banana");
+            values.put("quantity", "30");
+            
+            String insertPayload = TestProtocolHelper.formatInsert("Product", "upc", values);
+            Message addMsg = new Message(3, 456, insertPayload);
             client.sendAndReceive(addMsg);
 
             Thread.sleep(500);
 
-            // 2. Verify storage directly
-            Assertions.assertThat(storage.item_table.get("banana")).isEqualTo(
-                30
-            );
+            // 2. Get item "banana" (command_id 1)
+            String searchPayload = TestProtocolHelper.formatSearch("Product", new String[]{" and upc = 'banana'"}, 10, 0, null, true);
+            Message getMsg = new Message(1, 456, searchPayload);
+            byte[] responsePacket = client.sendAndReceive(getMsg);
+
+            String responseStr = TestProtocolHelper.decryptFullPacket(responsePacket);
+            Assertions.assertThat(responseStr).isEqualTo("30");
+
             System.out.println(
                 "UDP Storage verification passed: banana has 30 items"
             );

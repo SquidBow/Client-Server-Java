@@ -1,5 +1,6 @@
 package app.network.udp;
 
+import app.helpers.Message;
 import app.logic.*;
 import java.io.IOException;
 import java.net.*;
@@ -8,7 +9,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class StoreClientUDP extends Thread {
 
     public static int MAX_THREADS = 1;
-    private final AtomicInteger THREAD_COUNT = new AtomicInteger(0);
+    // private final AtomicInteger THREAD_COUNT = new AtomicInteger(0);
     private AtomicInteger id = new AtomicInteger(0);
 
     private final int port;
@@ -26,7 +27,7 @@ public class StoreClientUDP extends Thread {
 
     public void run() {
         for (int i = 0; i < MAX_THREADS; i++) {
-            THREAD_COUNT.incrementAndGet();
+            // THREAD_COUNT.incrementAndGet();
             new Thread(() -> execute()).start();
         }
     }
@@ -37,7 +38,12 @@ public class StoreClientUDP extends Thread {
                 Message msg = new Message(
                     3,
                     id.getAndIncrement(),
-                    "item_" + i + ":" + i
+                    "Product;upc;upc:item_" +
+                        i +
+                        ";name:Item_" +
+                        i +
+                        ";quantity:" +
+                        i
                 );
                 Encryptor encryptor = new Encryptor();
 
@@ -77,6 +83,6 @@ public class StoreClientUDP extends Thread {
             }
         } catch (IOException e) {}
 
-        THREAD_COUNT.decrementAndGet();
+        // THREAD_COUNT.decrementAndGet();
     }
 }

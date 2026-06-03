@@ -1,31 +1,45 @@
 package app.logic;
 
-import app.logic.Context;
-import app.logic.LogicTuple;
-import java.util.NoSuchElementException;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import static app.database.DataBaseManager.*;
 
-public class Processor implements IProcessor, Runnable {
+import app.helpers.*;
+import app.objects.GenericObject;
+import java.sql.*;
+import java.util.HashMap;
+import java.util.Map;
+
+public class Processor implements app.interfaces.IProcessor, Runnable {
 
     private QueueManager queueManager;
-    private Storage storage;
-    private Context context;
+    private Connection connection;
+    private NetContext context;
 
-    public Processor(QueueManager queueManager, Storage storage) {
+    public Processor(QueueManager queueManager, String db_name) {
         this.queueManager = queueManager;
-        this.storage = storage;
+        connection = createConenction(db_name);
     }
 
     public void run() {
         try {
             while (true) {
-                LogicTuple<Message> in = queueManager.processor_queue.take();
+                Tuple<Message> in = queueManager.processor_queue.take();
                 context = in.context;
-
                 try {
                     process(in.data);
-                } catch (Exception e) {}
+                } catch (Exception e) {
+                    System.err.println("Processing failed: " + e.getMessage());
+                    Message response = new Message();
+                    response.command_id = in.data.command_id;
+                    response.user_id = in.data.user_id;
+                    response.message = "ERROR: " + e.getMessage();
+                    try {
+                        queueManager.encrypt_queue.put(
+                            new Tuple<>(response, context)
+                        );
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -33,87 +47,75 @@ public class Processor implements IProcessor, Runnable {
     }
 
     public void process(Message message) {
-        Message message2 = new Message();
-        message2.command_id = message.command_id;
-        message2.user_id = message.user_id;
-        message2.message = "OK";
+        Message responce = new Message();
+        responce.command_id = message.command_id;
+        responce.user_id = message.user_id;
+        responce.message = "OK";
 
         // Maybe add auth to this when we execute command check for the right
+        // Search is 1
         if (message.command_id == 1) {
             // Get the item cause, I mean, that is what you sometimes have to do, yeah, imagine, crazy, that's just incredible, truly an unforgettable experience
-            int quantity = storage.item_table.getOrDefault(message.message, -1);
 
-            // if (quantity == -1) throw new IllegalArgumentException(
-            //     "Item doesn't exist."
-            // );
+            DBContext db_context = createDBContext(message.message);
 
-            if (quantity == -1) {
-                message2.message = "This item doesn't exist!";
-            } else {
-                message2.message = String.valueOf(quantity);
-            }
-        } else if (message.command_id == 2) {
-            String[] command_arguments = message.message.split(":");
+            try (Statement s = connection.createStatement()) {
+                ResultSet rs = s.executeQuery(createSelectSQL(db_context));
 
-            if (command_arguments.length > 2) {
-                throw new IllegalArgumentException(
-                    "The command takes only 2 arguments"
+                if (rs.next()) {
+                    responce.message = String.valueOf(rs.getInt("quantity"));
+                } else {
+                    responce.message = "Item not found";
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(
+                    "Smth has failed with executing query on getting some item: " +
+                        e.getMessage()
                 );
             }
+            //2 or 3 because already passign the object with updated values so they are the same
+        }
+        // Update is 2
+        else if (message.command_id == 2) {
+            // Idk what message is for cause will have all information from the object itself
+            // Apperantly I was wrong cause message is so important like bro, it caries the context
 
-            storage.item_table.merge(
-                command_arguments[0],
-                -Integer.parseInt(command_arguments[1]),
-                Integer::sum
+            DBObjectContext object_context = createDBObjectContext(
+                message.message
             );
-        } else if (message.command_id == 3) {
-            String[] command_arguments = message.message.split(":");
 
-            if (command_arguments.length > 2) {
-                throw new IllegalArgumentException(
-                    "The command takes only 2 arguments"
+            try (Statement s = connection.createStatement()) {
+                int rows = s.executeUpdate(
+                    createUpdateSQL(object_context.table, object_context.object)
+                );
+
+                responce.message = rows > 0 ? "Ok" : "Item not found";
+            } catch (SQLException e) {
+                throw new RuntimeException(
+                    "Smth has failed with executing query on updating some item: " +
+                        e.getMessage()
                 );
             }
-
-            storage.item_table.merge(
-                command_arguments[0],
-                Integer.parseInt(command_arguments[1]),
-                Integer::sum
+        }
+        //Insert is 3
+        else if (message.command_id == 3) {
+            DBObjectContext object_context = createDBObjectContext(
+                message.message
             );
-        } else if (message.command_id == 4) {
-            storage.groups.putIfAbsent(
-                message.message,
-                ConcurrentHashMap.newKeySet()
-            );
-        } else if (message.command_id == 5) {
-            String[] command_arguments = message.message.split(":");
 
-            if (command_arguments.length > 2) {
-                throw new IllegalArgumentException(
-                    "The command takes only 2 arguments"
+            try (Statement s = connection.createStatement()) {
+                int rows = s.executeUpdate(
+                    createInsertSQL(object_context.table, object_context.object)
+                );
+
+                responce.message =
+                    rows > 0 ? "Ok" : "Failed to create it for some reason.";
+            } catch (SQLException e) {
+                throw new RuntimeException(
+                    "Smth has failed with executing query on inserting some item: " +
+                        e.getMessage()
                 );
             }
-
-            Set<String> groups = storage.groups.get(command_arguments[0]);
-
-            if (groups == null) throw new NoSuchElementException(
-                "Group: " + command_arguments[0] + " doesn't exist."
-            );
-
-            groups.add(command_arguments[1]);
-        } else if (message.command_id == 6) {
-            String[] command_arguments = message.message.split(":");
-
-            if (command_arguments.length > 2) {
-                throw new IllegalArgumentException(
-                    "The command takes only 2 arguments"
-                );
-            }
-
-            storage.price_table.put(
-                command_arguments[0],
-                Integer.parseInt(command_arguments[1])
-            );
         }
 
         System.out.println(
@@ -125,17 +127,66 @@ public class Processor implements IProcessor, Runnable {
                 message.message
         );
 
-        System.out.println(
-            "Storage State -> Items: " +
-                storage.item_table +
-                ". Prices: " +
-                storage.price_table
-        );
-
         try {
-            queueManager.encrypt_queue.put(new LogicTuple<>(message2, context));
+            queueManager.encrypt_queue.put(
+                new Tuple<Message>(responce, context)
+            );
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    private DBObjectContext createDBObjectContext(String message) {
+        // Cause this is all mine I know I will defenetly do everything how I want and it will be correct
+        String[] fields = message.split(";", 3);
+
+        if (fields.length != 3) throw new IllegalArgumentException(
+            "Bad object context: expected 3 fields, got " + fields.length
+        );
+
+        return new DBObjectContext(
+            fields[0],
+            new GenericObject(fields[1], parseMap(fields[2]))
+        );
+    }
+
+    private Map<String, Object> parseMap(String s) {
+        Map<String, Object> map = new HashMap<String, Object>();
+
+        for (String pair : s.split(";")) {
+            if (pair.isBlank()) continue;
+
+            String[] kv = pair.split(":");
+
+            if (kv.length != 2) throw new IllegalArgumentException(
+                "Bad map pair: " + pair
+            );
+
+            map.put(kv[0], kv[1]);
+        }
+
+        return map;
+    }
+
+    private DBContext createDBContext(String message) {
+        // Cause this is all mine I know I will defenetly do everything how I want and it will be correct
+        String[] fields = message.split(";", 6);
+
+        if (fields.length != 6) throw new IllegalArgumentException(
+            "Bad database context: expected 6 fields, got " + fields.length
+        );
+
+        String col = null;
+
+        if (!fields[4].isBlank()) col = fields[4];
+
+        return new DBContext(
+            fields[0],
+            fields[1].isEmpty() ? new String[0] : fields[1].split(":"),
+            Integer.parseInt(fields[2]),
+            Integer.parseInt(fields[3]),
+            col,
+            Boolean.parseBoolean(fields[5])
+        );
     }
 }
