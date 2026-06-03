@@ -1,0 +1,11 @@
+services:
+  mysql-db:
+    image: mysql:8.0
+    container_name: mysql_server
+    restart: always
+    environment:
+      # default user is 'root'
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: my_db
+    ports:
+      - "3306:3306"
