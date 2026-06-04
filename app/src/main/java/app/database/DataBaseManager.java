@@ -7,7 +7,7 @@ import java.util.Map;
 
 public class DataBaseManager {
 
-    public static Connection createConenction(String url) {
+    public static Connection createConnection(String url) {
         try {
             String jdbcUrl = url.startsWith("jdbc:")
                 ? url
@@ -35,7 +35,32 @@ public class DataBaseManager {
         }
     }
 
-    public static String createFilter(
+    // public static String createFilter(
+    //     String column,
+    //     String word,
+    //     boolean exact
+    // ) {
+    //     String sql = " and " + column;
+
+    //     if (exact) {
+    //         return sql + " = '" + word + "'";
+    //     } else {
+    //         return sql + " like '%" + word + "%'";
+    //     }
+    // }
+
+    // public static String createFilter(String column, int val, boolean minimum) {
+    //     String sql = " and " + column;
+
+    //     if (minimum) {
+    //         return sql + " >= " + val;
+    //     } else {
+    //         return sql + " <= " + val;
+    //     }
+    // }
+
+    // Since filters are gona be created on the client need to pass in the value to the use later
+    public static String createFilterStatement(
         String column,
         String word,
         boolean exact
@@ -43,31 +68,62 @@ public class DataBaseManager {
         String sql = " and " + column;
 
         if (exact) {
-            return sql + " = '" + word + "'";
+            sql += " = ?";
         } else {
-            return sql + " like '%" + word + "%'";
+            sql += " like ?";
         }
+
+        return sql + "|||%" + word + "%";
     }
 
-    public static String createFilter(String column, int val, boolean minimum) {
+    public static String createFilterStatement(
+        String column,
+        int val,
+        boolean minimum
+    ) {
         String sql = " and " + column;
 
         if (minimum) {
-            return sql + " >= " + val;
+            sql += " >= ?";
         } else {
-            return sql + " <= " + val;
+            sql += " <= ?";
         }
+
+        return sql + "|||" + String.valueOf(val);
     }
 
-    public static String createSelectSQL(DBContext context) {
-        String sql = "select * from '" + context.table + "' where 1=1 ";
+    // public static String createSelectSQL(DBContext context) {
+    //     String sql = "select * from \"" + context.table + "\" where 1=1 ";
 
+    //     for (String filter : context.filters) {
+    //         sql += filter;
+    //     }
+
+    //     if (context.order_column != null) {
+    //         sql += " order by " + context.order_column;
+
+    //         if (context.order_ascending) {
+    //             sql += " asc";
+    //         } else {
+    //             sql += " desc";
+    //         }
+    //     }
+
+    //     sql += " LIMIT " + context.limit + " OFFSET " + context.offset;
+
+    //     return sql;
+    // }
+
+    public static String createSelectStatement(DBContext context) {
+        String sql = "select * from \"" + context.table + "\" where 1=1 ";
+
+        // Each filter comes with a ? instead of value
         for (String filter : context.filters) {
-            sql += filter;
+            sql += filter.split("\\|\\|\\|")[0];
         }
 
         if (context.order_column != null) {
-            sql += "order by " + context.order_column;
+            sql += " order by " + context.order_column;
 
             if (context.order_ascending) {
                 sql += " asc";
@@ -76,13 +132,32 @@ public class DataBaseManager {
             }
         }
 
-        sql += " LIMIT " + context.limit + " OFFSET " + context.offset;
+        sql += " LIMIT ? OFFSET ?";
 
         return sql;
     }
 
-    public static String createInsertSQL(String table, IDBObject object) {
-        String sql = "insert into " + table + " (";
+    // public static String createInsertSQL(String table, IDBObject object) {
+    //     String sql = "insert into \"" + table + "\" (";
+
+    //     for (String key : object.getMap().keySet()) {
+    //         sql += key + ", ";
+    //     }
+
+    //     // Remove the last coma
+    //     sql = sql.substring(0, sql.length() - 2) + ") values (";
+
+    //     for (Object val : object.getMap().values()) {
+    //         sql += objectToString(val) + ", ";
+    //     }
+
+    //     sql = sql.substring(0, sql.length() - 2) + ")";
+
+    //     return sql;
+    // }
+
+    public static String createInsertStatement(String table, IDBObject object) {
+        String sql = "insert into \"" + table + "\" (";
 
         for (String key : object.getMap().keySet()) {
             sql += key + ", ";
@@ -92,7 +167,7 @@ public class DataBaseManager {
         sql = sql.substring(0, sql.length() - 2) + ") values (";
 
         for (Object val : object.getMap().values()) {
-            sql += objectToString(val) + ", ";
+            sql += "?, ";
         }
 
         sql = sql.substring(0, sql.length() - 2) + ")";
@@ -100,22 +175,41 @@ public class DataBaseManager {
         return sql;
     }
 
-    private static String objectToString(Object object) {
-        if (object instanceof String) {
-            return "'" + object.toString() + "'";
-        } else return object.toString();
-    }
+    // private static String objectToString(Object object) {
+    //     if (object instanceof String) {
+    //         return "'" + object.toString() + "'";
+    //     } else return object.toString();
+    // }
 
-    public static String createUpdateSQL(String table, IDBObject object) {
-        String sql = "update " + table + " set ";
+    // public static String createUpdateSQL(String table, IDBObject object) {
+    //     String sql = "update \"" + table + "\" set ";
+
+    //     for (Map.Entry<String, Object> entry : object.getMap().entrySet()) {
+    //         if (!entry.getKey().equals(object.getPrimaryKey())) {
+    //             sql +=
+    //                 entry.getKey() +
+    //                 " = " +
+    //                 objectToString(entry.getValue()) +
+    //                 ", ";
+    //         }
+    //     }
+
+    //     sql =
+    //         sql.substring(0, sql.length() - 2) +
+    //         " where " +
+    //         object.getPrimaryKey() +
+    //         " = " +
+    //         objectToString(object.getPrimaryValue());
+
+    //     return sql;
+    // }
+
+    public static String createUpdateStatement(String table, IDBObject object) {
+        String sql = "update \"" + table + "\" set ";
 
         for (Map.Entry<String, Object> entry : object.getMap().entrySet()) {
             if (!entry.getKey().equals(object.getPrimaryKey())) {
-                sql +=
-                    entry.getKey() +
-                    " = " +
-                    objectToString(entry.getValue()) +
-                    ", ";
+                sql += entry.getKey() + " = ?, ";
             }
         }
 
@@ -123,20 +217,29 @@ public class DataBaseManager {
             sql.substring(0, sql.length() - 2) +
             " where " +
             object.getPrimaryKey() +
-            " = " +
-            objectToString(object.getPrimaryValue());
+            " = ?";
 
         return sql;
     }
 
-    public static String createDeleteSQL(String table, IDBObject object) {
+    // public static String createDeleteSQL(String table, IDBObject object) {
+    //     return (
+    //         "delete from \"" +
+    //         table +
+    //         "\" where " +
+    //         object.getPrimaryKey() +
+    //         " = " +
+    //         objectToString(object.getPrimaryValue())
+    //     );
+    // }
+
+    public static String createDeleteStatement(String table, IDBObject object) {
         return (
-            "delete from " +
+            "delete from \"" +
             table +
-            " where " +
+            "\" where " +
             object.getPrimaryKey() +
-            " = " +
-            objectToString(object.getPrimaryValue())
+            " = ?"
         );
     }
 

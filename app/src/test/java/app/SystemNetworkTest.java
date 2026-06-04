@@ -48,7 +48,7 @@ public class SystemNetworkTest {
             // 2. Get item "test_apple" (command_id 1)
             String searchPayload = TestProtocolHelper.formatSearch(
                 "Product",
-                new String[] { " and upc = 'test_apple'" },
+                new String[] { " and upc = ?|||test_apple" },
                 10,
                 0,
                 null,

@@ -38,11 +38,11 @@ public class StoreClientUDP extends Thread {
                 Message msg = new Message(
                     3,
                     id.getAndIncrement(),
-                    "Product;upc;upc:item_" +
+                    "Product;;;upc;;;upc:::item_" +
                         i +
-                        ";name:Item_" +
+                        ";;;name:::Item_" +
                         i +
-                        ";quantity:" +
+                        ";;;quantity:::" +
                         i
                 );
                 Encryptor encryptor = new Encryptor();

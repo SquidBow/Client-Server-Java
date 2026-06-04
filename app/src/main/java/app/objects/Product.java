@@ -1,11 +1,12 @@
 package app.objects;
 
 import app.interfaces.*;
+import java.util.HashMap;
 import java.util.Map;
 
 public class Product implements IDBObject {
 
-    public Map<String, Object> product;
+    public Map<String, Object> product = new HashMap<>();
 
     public Product(
         String upc,

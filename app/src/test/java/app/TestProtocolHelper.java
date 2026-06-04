@@ -6,21 +6,21 @@ import java.util.StringJoiner;
 public class TestProtocolHelper {
 
     public static String formatInsert(String table, String pk, Map<String, String> values) {
-        StringJoiner mapJoiner = new StringJoiner(";");
+        StringJoiner mapJoiner = new StringJoiner(";;;");
         for (Map.Entry<String, String> entry : values.entrySet()) {
-            mapJoiner.add(entry.getKey() + ":" + entry.getValue());
+            mapJoiner.add(entry.getKey() + ":::" + entry.getValue());
         }
-        return table + ";" + pk + ";" + mapJoiner.toString();
+        return table + ";;;" + pk + ";;;" + mapJoiner.toString();
     }
 
     public static String formatSearch(String table, String[] filters, int limit, int offset, String orderCol, boolean ascending) {
-        StringJoiner filterJoiner = new StringJoiner(":");
+        StringJoiner filterJoiner = new StringJoiner(":::");
         if (filters != null) {
             for (String f : filters) {
                 filterJoiner.add(f);
             }
         }
-        return String.format("%s;%s;%d;%d;%s;%b", 
+        return String.format("%s;;;%s;;;%d;;;%d;;;%s;;;%b", 
             table, 
             filterJoiner.toString(), 
             limit, 

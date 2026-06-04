@@ -42,7 +42,7 @@ public class SystemUdpTest {
             Thread.sleep(500);
 
             // 2. Get item "banana" (command_id 1)
-            String searchPayload = TestProtocolHelper.formatSearch("Product", new String[]{" and upc = 'banana'"}, 10, 0, null, true);
+            String searchPayload = TestProtocolHelper.formatSearch("Product", new String[]{" and upc = ?|||banana"}, 10, 0, null, true);
             Message getMsg = new Message(1, 456, searchPayload);
             byte[] responsePacket = client.sendAndReceive(getMsg);
 

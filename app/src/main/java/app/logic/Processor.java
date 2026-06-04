@@ -16,7 +16,7 @@ public class Processor implements app.interfaces.IProcessor, Runnable {
 
     public Processor(QueueManager queueManager, String db_name) {
         this.queueManager = queueManager;
-        connection = createConenction(db_name);
+        connection = createConnection(db_name);
     }
 
     public void run() {
@@ -59,8 +59,20 @@ public class Processor implements app.interfaces.IProcessor, Runnable {
 
             DBContext db_context = createDBContext(message.message);
 
-            try (Statement s = connection.createStatement()) {
-                ResultSet rs = s.executeQuery(createSelectSQL(db_context));
+            try (
+                PreparedStatement ps = connection.prepareStatement(
+                    createSelectStatement(db_context)
+                )
+            ) {
+                int i = 1;
+
+                for (String f : db_context.filters)
+                    ps.setObject(i++, f.split("\\|\\|\\|")[1]);
+
+                ps.setObject(i++, db_context.limit);
+                ps.setObject(i++, db_context.offset);
+
+                ResultSet rs = ps.executeQuery();
 
                 if (rs.next()) {
                     responce.message = String.valueOf(rs.getInt("quantity"));
@@ -73,8 +85,8 @@ public class Processor implements app.interfaces.IProcessor, Runnable {
                         e.getMessage()
                 );
             }
-            //2 or 3 because already passign the object with updated values so they are the same
         }
+        //2 or 3 because already passign the object with updated values so they are the same
         // Update is 2
         else if (message.command_id == 2) {
             // Idk what message is for cause will have all information from the object itself
@@ -84,10 +96,31 @@ public class Processor implements app.interfaces.IProcessor, Runnable {
                 message.message
             );
 
-            try (Statement s = connection.createStatement()) {
-                int rows = s.executeUpdate(
-                    createUpdateSQL(object_context.table, object_context.object)
-                );
+            try (
+                PreparedStatement ps = connection.prepareStatement(
+                    createUpdateStatement(
+                        object_context.table,
+                        object_context.object
+                    )
+                )
+            ) {
+                int i = 0;
+
+                for (Map.Entry<String, Object> entry : object_context.object
+                    .getMap()
+                    .entrySet()) {
+                    if (
+                        !entry
+                            .getKey()
+                            .equals(object_context.object.getPrimaryKey())
+                    ) {
+                        ps.setObject(++i, entry.getValue());
+                    }
+                }
+
+                ps.setObject(++i, object_context.object.getPrimaryValue());
+
+                int rows = ps.executeUpdate();
 
                 responce.message = rows > 0 ? "Ok" : "Item not found";
             } catch (SQLException e) {
@@ -103,16 +136,54 @@ public class Processor implements app.interfaces.IProcessor, Runnable {
                 message.message
             );
 
-            try (Statement s = connection.createStatement()) {
-                int rows = s.executeUpdate(
-                    createInsertSQL(object_context.table, object_context.object)
-                );
+            try (
+                PreparedStatement ps = connection.prepareStatement(
+                    createInsertStatement(
+                        object_context.table,
+                        object_context.object
+                    )
+                )
+            ) {
+                int i = 0;
+
+                for (Object val : object_context.object.getMap().values()) {
+                    ps.setObject(++i, val);
+                }
+
+                int rows = ps.executeUpdate();
 
                 responce.message =
                     rows > 0 ? "Ok" : "Failed to create it for some reason.";
             } catch (SQLException e) {
                 throw new RuntimeException(
                     "Smth has failed with executing query on inserting some item: " +
+                        e.getMessage()
+                );
+            }
+        }
+        // Add 4 as an update
+        else if (message.command_id == 4) {
+            DBObjectContext object_context = createDBObjectContext(
+                message.message
+            );
+
+            try (
+                PreparedStatement ps = connection.prepareStatement(
+                    createDeleteStatement(
+                        object_context.table,
+                        object_context.object
+                    )
+                )
+            ) {
+                ps.setObject(1, object_context.object.getPrimaryValue());
+
+                int rows = ps.executeUpdate();
+
+                responce.message =
+                    rows > 0 ? "Ok" : "Failed to create it for some reason.";
+            } catch (SQLException e) {
+                throw new RuntimeException(
+                    "Smth has failed with executing query on deleting some item: " +
                         e.getMessage()
                 );
             }
@@ -138,7 +209,7 @@ public class Processor implements app.interfaces.IProcessor, Runnable {
 
     private DBObjectContext createDBObjectContext(String message) {
         // Cause this is all mine I know I will defenetly do everything how I want and it will be correct
-        String[] fields = message.split(";", 3);
+        String[] fields = message.split(";;;", 3);
 
         if (fields.length != 3) throw new IllegalArgumentException(
             "Bad object context: expected 3 fields, got " + fields.length
@@ -153,10 +224,10 @@ public class Processor implements app.interfaces.IProcessor, Runnable {
     private Map<String, Object> parseMap(String s) {
         Map<String, Object> map = new HashMap<String, Object>();
 
-        for (String pair : s.split(";")) {
+        for (String pair : s.split(";;;")) {
             if (pair.isBlank()) continue;
 
-            String[] kv = pair.split(":");
+            String[] kv = pair.split(":::");
 
             if (kv.length != 2) throw new IllegalArgumentException(
                 "Bad map pair: " + pair
@@ -170,7 +241,7 @@ public class Processor implements app.interfaces.IProcessor, Runnable {
 
     private DBContext createDBContext(String message) {
         // Cause this is all mine I know I will defenetly do everything how I want and it will be correct
-        String[] fields = message.split(";", 6);
+        String[] fields = message.split(";;;", 6);
 
         if (fields.length != 6) throw new IllegalArgumentException(
             "Bad database context: expected 6 fields, got " + fields.length
@@ -182,7 +253,7 @@ public class Processor implements app.interfaces.IProcessor, Runnable {
 
         return new DBContext(
             fields[0],
-            fields[1].isEmpty() ? new String[0] : fields[1].split(":"),
+            fields[1].isEmpty() ? new String[0] : fields[1].split(":::"),
             Integer.parseInt(fields[2]),
             Integer.parseInt(fields[3]),
             col,
