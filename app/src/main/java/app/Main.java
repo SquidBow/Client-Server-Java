@@ -1,7 +1,7 @@
 package app;
 
-import app.logic.*;
-import app.network.tcp.StoreServerTCP;
+import app.server.logic.*;
+import app.server.network.tcp.StoreServerTCP;
 import java.util.ArrayList;
 import java.util.List;
 

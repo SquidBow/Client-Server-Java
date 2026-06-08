@@ -1,7 +1,7 @@
 package app;
 
-import app.helpers.*;
-import app.logic.Encryptor;
+import app.generic.helpers.*;
+import app.server.logic.Encryptor;
 import java.io.IOException;
 import java.net.*;
 
