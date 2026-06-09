@@ -1,4 +1,4 @@
-package app.server.interfaces;
+package app.generic.interfaces;
 
 public interface IDecryptor {
     // Why tf does this return void? It is supposed to be Message

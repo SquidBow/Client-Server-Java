@@ -21,7 +21,8 @@ public class Employee implements IDBObject {
         String phone_number,
         String city,
         String street,
-        String zip_code
+        String zip_code,
+        String password
     ) {
         employee.put("id_employee", id_employee);
         employee.put("empl_surname", empl_surname);
@@ -35,6 +36,7 @@ public class Employee implements IDBObject {
         employee.put("city", city);
         employee.put("street", street);
         employee.put("zip_code", zip_code);
+        employee.put("password", password);
     }
 
     @Override

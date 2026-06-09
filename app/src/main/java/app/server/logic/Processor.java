@@ -4,6 +4,8 @@ import static app.server.database.DataBaseManager.*;
 
 import app.generic.helpers.*;
 import app.generic.objects.GenericObject;
+import com.sun.javafx.scene.shape.MeshHelper.MeshAccessor;
+import java.security.MessageDigestSpi;
 import java.sql.*;
 import java.util.HashMap;
 import java.util.Map;
@@ -52,12 +54,35 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         responce.user_id = message.user_id;
         responce.message = "OK";
 
+        //Auth user
+        if (message.command_id == 0) {
+            responce.message = checkAuth(message.user_id, message.message);
+
+            sendMessage(responce);
+
+            return;
+        }
+
+        String[] process_string = message.message.split("%%%");
+        String auth = checkAuth(message.user_id, process_string[0]);
+
+        if (auth.equals("Failed auth")) {
+            responce.message = auth;
+
+            sendMessage(responce);
+
+            return;
+        }
+
+        //TODO: ALL THAT NEEDS TO BE REFACTORED INTO DIFFERENT FUNCTIONS
+
         // Maybe add auth to this when we execute command check for the right
         // Search is 1
         if (message.command_id == 1) {
-            // Get the item cause, I mean, that is what you sometimes have to do, yeah, imagine, crazy, that's just incredible, truly an unforgettable experience
+            // Get the table cause, I mean, that is what you sometimes have to do, yeah,
+            // imagine, crazy, that's just incredible, truly an unforgettable experience
 
-            DBContext db_context = createDBContext(message.message);
+            DBContext db_context = createDBContext(process_string[1]);
 
             try (
                 PreparedStatement ps = connection.prepareStatement(
@@ -67,17 +92,37 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                 int i = 1;
 
                 for (String f : db_context.filters)
-                    ps.setObject(i++, f.split("\\|\\|\\|")[1]);
+                    ps.setObject(i++, f.split("&&&")[1]);
 
                 ps.setObject(i++, db_context.limit);
                 ps.setObject(i++, db_context.offset);
 
                 ResultSet rs = ps.executeQuery();
 
-                if (rs.next()) {
-                    responce.message = String.valueOf(rs.getInt("quantity"));
-                } else {
-                    responce.message = "Item not found";
+                ResultSetMetaData meta_data = rs.getMetaData();
+                int column_count = meta_data.getColumnCount();
+
+                responce.message = "";
+
+                for (int col = 1; col <= column_count; col++) {
+                    String col_name = meta_data.getColumnName(col);
+
+                    if (col_name.equals("password")) continue;
+
+                    if (col > 1) responce.message += (":::");
+                    responce.message += col_name;
+                }
+
+                while (rs.next()) {
+                    responce.message += ";;;";
+
+                    for (int col = 1; col <= column_count; col++) {
+                        if (col > 1) responce.message += ":::";
+
+                        Object val = rs.getObject(col);
+                        responce.message +=
+                            val == null ? "null" : val.toString();
+                    }
                 }
             } catch (SQLException e) {
                 throw new RuntimeException(
@@ -86,15 +131,26 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                 );
             }
         }
-        //2 or 3 because already passign the object with updated values so they are the same
+        // 2 or 3 because already passign the object with updated values so they are the
+        // same
         // Update is 2
         else if (message.command_id == 2) {
-            // Idk what message is for cause will have all information from the object itself
-            // Apperantly I was wrong cause message is so important like bro, it caries the context
+            // Idk what message is for cause will have all information from the object
+            // itself
+
+            // (Later) Apperantly I was wrong cause message is so important like bro, it caries the
+            // context
 
             DBObjectContext object_context = createDBObjectContext(
-                message.message
+                process_string[1]
             );
+
+            if (!verifyPermissions(auth, object_context.table)) {
+                responce.message = "Operation not permitted";
+                sendMessage(responce);
+
+                return;
+            }
 
             try (
                 PreparedStatement ps = connection.prepareStatement(
@@ -130,11 +186,18 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                 );
             }
         }
-        //Insert is 3
+        // Insert is 3
         else if (message.command_id == 3) {
             DBObjectContext object_context = createDBObjectContext(
-                message.message
+                process_string[1]
             );
+
+            if (!verifyPermissions(auth, object_context.table)) {
+                responce.message = "Operation not permitted";
+                sendMessage(responce);
+
+                return;
+            }
 
             try (
                 PreparedStatement ps = connection.prepareStatement(
@@ -164,8 +227,15 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         // Add 4 as an update
         else if (message.command_id == 4) {
             DBObjectContext object_context = createDBObjectContext(
-                message.message
+                process_string[1]
             );
+
+            if (!verifyPermissions(auth, object_context.table)) {
+                responce.message = "Operation not permitted";
+                sendMessage(responce);
+
+                return;
+            }
 
             try (
                 PreparedStatement ps = connection.prepareStatement(
@@ -195,20 +265,36 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                 "\nUser_id: " +
                 message.user_id +
                 "\nMessage: " +
-                message.message
+                process_string[1]
         );
 
+        sendMessage(responce);
+    }
+
+    private boolean verifyPermissions(String empl_role, String table) {
+        return (
+            (empl_role.equals("Cashier") &&
+                (table.equals("Check") ||
+                    table.equals("Customer_Card") ||
+                    table.equals("Sale"))) || empl_role.equals("Manager")
+        );
+    }
+
+    private void sendMessage(Message message) {
         try {
             queueManager.encrypt_queue.put(
-                new Tuple<Message>(responce, context)
+                new Tuple<Message>(message, context)
             );
+
+            return;
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            e.printStackTrace();
         }
     }
 
     private DBObjectContext createDBObjectContext(String message) {
-        // Cause this is all mine I know I will defenetly do everything how I want and it will be correct
+        // Cause this is all mine I know I will defenetly do everything how I want and
+        // it will be correct
         String[] fields = message.split(";;;", 3);
 
         if (fields.length != 3) throw new IllegalArgumentException(
@@ -224,10 +310,10 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
     private Map<String, Object> parseMap(String s) {
         Map<String, Object> map = new HashMap<String, Object>();
 
-        for (String pair : s.split(";;;")) {
+        for (String pair : s.split(":::")) {
             if (pair.isBlank()) continue;
 
-            String[] kv = pair.split(":::");
+            String[] kv = pair.split("&&&");
 
             if (kv.length != 2) throw new IllegalArgumentException(
                 "Bad map pair: " + pair
@@ -240,7 +326,8 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
     }
 
     private DBContext createDBContext(String message) {
-        // Cause this is all mine I know I will defenetly do everything how I want and it will be correct
+        // Cause this is all mine I know I will defenetly do everything how I want and
+        // it will be correct
         String[] fields = message.split(";;;", 6);
 
         if (fields.length != 6) throw new IllegalArgumentException(
@@ -259,5 +346,26 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
             col,
             Boolean.parseBoolean(fields[5])
         );
+    }
+
+    private String checkAuth(int user_id, String password) {
+        try (
+            PreparedStatement ps = connection.prepareStatement(
+                "select empl_role from Employee where id_employee = ? and password = ?"
+            )
+        ) {
+            ps.setString(1, String.valueOf(user_id));
+            ps.setString(2, password);
+
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.next()) {
+                return rs.getString("empl_role");
+            } else {
+                return "Failed auth";
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed Auth: " + e.getMessage());
+        }
     }
 }

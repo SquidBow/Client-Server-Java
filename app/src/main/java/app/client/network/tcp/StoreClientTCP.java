@@ -1,7 +1,8 @@
 package app.client.network.tcp;
 
 import app.generic.helpers.Message;
-import app.server.logic.*;
+import app.generic.logic.Decryptor;
+import app.generic.logic.Encryptor;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -30,7 +31,9 @@ public class StoreClientTCP extends Thread {
             for (int i = 0; i < MAX_THREADS; i++) {
                 new Thread(() -> sendMessage(addr)).start();
             }
-        } catch (IOException e) {}
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private void sendMessage(InetAddress addr) {
@@ -42,7 +45,9 @@ public class StoreClientTCP extends Thread {
             } catch (IOException e) {
                 try {
                     Thread.sleep(1000);
-                } catch (InterruptedException e2) {}
+                } catch (InterruptedException e2) {
+                    e2.printStackTrace();
+                }
             }
         }
 
@@ -54,11 +59,11 @@ public class StoreClientTCP extends Thread {
                 Message msg = new Message(
                     3,
                     id.getAndIncrement(),
-                    "Product;;;upc;;;upc:::item_" +
+                    "Product;;;upc;;;upc&&&item_" +
                         i +
-                        ";;;name:::Item_" +
+                        ":::name&&&Item_" +
                         i +
-                        ";;;quantity:::" +
+                        ":::quantity&&&" +
                         i
                 );
 
@@ -74,6 +79,20 @@ public class StoreClientTCP extends Thread {
 
                 int length = ByteBuffer.wrap(header).getInt(10) + 2;
                 byte[] body = in.readNBytes(length);
+
+                Decryptor decryptor = new Decryptor(null);
+
+                byte[] decrypt_packet = new byte[16 + length];
+                System.arraycopy(header, 0, packet, 0, 16);
+                System.arraycopy(body, 0, packet, 16, length);
+
+                Message decrypted_message = decryptor.getDecryptedMessage(
+                    decrypt_packet
+                );
+
+                System.out.println(
+                    "Client " + id + " received response: " + decrypted_message
+                );
             }
 
             // System.out.println("Client " + id + " received response)
@@ -81,7 +100,9 @@ public class StoreClientTCP extends Thread {
         } finally {
             try {
                 socket.close();
-            } catch (IOException e) {}
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
 
             // THREAD_COUNT.decrementAndGet();
         }

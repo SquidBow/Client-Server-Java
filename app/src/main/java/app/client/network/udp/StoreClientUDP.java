@@ -1,7 +1,8 @@
 package app.client.network.udp;
 
 import app.generic.helpers.Message;
-import app.server.logic.Encryptor;
+import app.generic.logic.Encryptor;
+
 import java.io.IOException;
 import java.net.*;
 import java.util.concurrent.atomic.AtomicInteger;

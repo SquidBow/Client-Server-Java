@@ -1,5 +1,7 @@
 package app;
 
+import app.generic.logic.Decryptor;
+import app.generic.logic.Encryptor;
 import app.server.logic.*;
 import app.server.network.tcp.StoreServerTCP;
 import java.util.ArrayList;
@@ -30,9 +32,6 @@ public class Main {
         for (int i = 0; i < numEncryptors; i++) threads.add(
             new Thread(new Encryptor(queueManager))
         );
-        // for (int i = 0; i < numSenders; i++) threads.add(
-        //     new Thread(new Sender(queueManager))
-        // );
 
         for (Thread thread : threads) {
             thread.start();

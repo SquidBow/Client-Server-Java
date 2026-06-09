@@ -1,4 +1,4 @@
-package app.server.interfaces;
+package app.generic.interfaces;
 
 import app.generic.helpers.Message;
 
