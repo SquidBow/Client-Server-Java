@@ -7,12 +7,13 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.atomic.AtomicInteger;
+
+// import java.util.concurrent.atomic.AtomicInteger;
 
 public class StoreServerTCP extends Thread {
 
     public static int MAX_THREADS = 1;
-    private final AtomicInteger THREAD_COUNT = new AtomicInteger(0);
+    // private final AtomicInteger THREAD_COUNT = new AtomicInteger(0);
     private Semaphore semaphore = new Semaphore(MAX_THREADS);
 
     QueueManager queue;
@@ -63,13 +64,11 @@ public class StoreServerTCP extends Thread {
 
                         try {
                             socket.close();
-                        } catch (IOException e) {
-                        }
+                        } catch (IOException e) {}
                     }
                 }).start();
             }
-        } catch (InterruptedException | IOException e) {
-        }
+        } catch (InterruptedException | IOException e) {}
     }
 
     private void execute(Socket socket) throws RuntimeException {
@@ -83,8 +82,7 @@ public class StoreServerTCP extends Thread {
             while (true) {
                 int bytes_read = in.readNBytes(buffer, 0, 16);
 
-                if (bytes_read < 16)
-                    break;
+                if (bytes_read < 16) break;
 
                 int length = ByteBuffer.wrap(buffer).getInt(10) + 2;
 
@@ -102,8 +100,7 @@ public class StoreServerTCP extends Thread {
 
             try {
                 socket.close();
-            } catch (IOException e) {
-            }
+            } catch (IOException e) {}
         }
     }
 }

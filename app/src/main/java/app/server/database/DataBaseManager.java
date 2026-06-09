@@ -7,6 +7,8 @@ import java.util.Map;
 
 public class DataBaseManager {
 
+    private static boolean DEBUG = true;
+
     public static Connection createConnection(String url) {
         try {
             String jdbcUrl = url.startsWith("jdbc:")
@@ -114,6 +116,30 @@ public class DataBaseManager {
                 for (String sql : createTableStatements) {
                     stmt.execute(sql);
                 }
+
+                // Insert test data if table is empty
+                if (DEBUG) {
+                    ResultSet rs = stmt.executeQuery(
+                        "SELECT COUNT(*) FROM Employee"
+                    );
+                    if (rs.next() && rs.getInt(1) == 0) {
+                        stmt.execute(
+                            """
+                            INSERT INTO Employee (id_employee, empl_surname, empl_name, empl_role, salary, date_of_birth, date_of_start, phone_number, city, street, zip_code, password)
+                            VALUES ('1', 'Admin', 'Admin', 'Manager', 10000, '1990-01-01', '2020-01-01', '+380000000000', 'Kyiv', 'Central', '01001', 'admin');
+                            """
+                        );
+                        stmt.execute(
+                            """
+                            INSERT INTO Employee (id_employee, empl_surname, empl_name, empl_role, salary, date_of_birth, date_of_start, phone_number, city, street, zip_code, password)
+                            VALUES ('2', 'User', 'User', 'Cashier', 5000, '1995-01-01', '2021-01-01', '+380000000001', 'Kyiv', 'Side', '01002', 'user');
+                            """
+                        );
+                        System.out.println(
+                            "Test employees added: Admin (ID: 1, Pass: admin), User (ID: 2, Pass: user)"
+                        );
+                    }
+                }
             }
 
             return connection;
@@ -190,7 +216,7 @@ public class DataBaseManager {
         // Remove the last coma
         sql = sql.substring(0, sql.length() - 2) + ") values (";
 
-        for (Object val : object.getMap().values()) {
+        for (int i = 0; i < object.getMap().values().size(); i++) {
             sql += "?, ";
         }
 

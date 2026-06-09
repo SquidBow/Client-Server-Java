@@ -1,5 +1,6 @@
 package app.client.app;
 
+import app.client.app.LoginPage.ClientInfo;
 import app.client.network.tcp.ActualClient;
 import app.generic.helpers.Message;
 import java.util.*;
@@ -27,10 +28,26 @@ public class ClientApp extends Application {
         "Store_Product",
     };
 
+    private static ClientInfo client_info;
+
     private TableView<ObservableList<String>> table_view = new TableView<>();
 
     @Override
     public void start(Stage primary_stage) {
+        try {
+            client_info = LoginPage.showLoginPage();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return;
+        }
+
+        System.out.println("Got id: " + client_info.user_id);
+        System.out.println("Got password: " + client_info.password);
+
+        showAppStage(primary_stage);
+    }
+
+    private void showAppStage(Stage primary_stage) {
         ComboBox<String> table_selector = new ComboBox<>();
         table_selector.getItems().addAll(TABLES);
         table_selector.setValue(TABLES[0]);
@@ -56,7 +73,14 @@ public class ClientApp extends Application {
         new Thread(() -> {
             try {
                 String responce_body = ActualClient.sendRequest(
-                    new Message(1, 0, table_name + ";;;;;;1000;;;0;;;;;;false")
+                    new Message(
+                        1,
+                        client_info.user_id,
+                        client_info.password +
+                            "%%%" +
+                            table_name +
+                            ";;;;;;1000;;;0;;;;;;false"
+                    )
                 ).message;
 
                 if (responce_body == null) return;

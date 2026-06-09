@@ -4,8 +4,6 @@ import static app.server.database.DataBaseManager.*;
 
 import app.generic.helpers.*;
 import app.generic.objects.GenericObject;
-import com.sun.javafx.scene.shape.MeshHelper.MeshAccessor;
-import java.security.MessageDigestSpi;
 import java.sql.*;
 import java.util.HashMap;
 import java.util.Map;
@@ -54,19 +52,26 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         responce.user_id = message.user_id;
         responce.message = "OK";
 
+        //Credentials%%%password%%%data
+        String[] process_string = message.message.split("%%%");
+
         //Auth user
         if (message.command_id == 0) {
-            responce.message = checkAuth(message.user_id, message.message);
-
+            String auth = checkAuthLogin(process_string[0], process_string[1]);
+            responce.message = auth;
             sendMessage(responce);
 
             return;
         }
 
-        String[] process_string = message.message.split("%%%");
         String auth = checkAuth(message.user_id, process_string[0]);
 
         if (auth.equals("Failed auth")) {
+            System.out.println("Failed auth with id: " + message.user_id);
+            System.out.println(
+                "Failed auth with passowrd: " + process_string[0]
+            );
+
             responce.message = auth;
 
             sendMessage(responce);
@@ -348,13 +353,38 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         );
     }
 
-    private String checkAuth(int user_id, String password) {
+    private String checkAuthLogin(String empl_credentials, String password) {
+        try (
+            PreparedStatement ps = connection.prepareStatement(
+                "select id_employee, empl_role from Employee where (empl_surname || ' ' || empl_name) = ? and password = ?"
+            )
+        ) {
+            ps.setString(1, empl_credentials);
+            ps.setString(2, password);
+
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.next()) {
+                return (
+                    rs.getString("id_employee") +
+                    "%%%" +
+                    rs.getString("empl_role")
+                );
+            } else {
+                return "Failed auth";
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed Auth: " + e.getMessage());
+        }
+    }
+
+    private String checkAuth(int empl_id, String password) {
         try (
             PreparedStatement ps = connection.prepareStatement(
                 "select empl_role from Employee where id_employee = ? and password = ?"
             )
         ) {
-            ps.setString(1, String.valueOf(user_id));
+            ps.setString(1, String.valueOf(empl_id));
             ps.setString(2, password);
 
             ResultSet rs = ps.executeQuery();
