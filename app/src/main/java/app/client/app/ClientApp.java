@@ -28,6 +28,8 @@ public class ClientApp extends Application {
         "Store_Product",
     };
 
+    ActualClient actual_client;
+
     private static ClientInfo client_info;
 
     private TableView<ObservableList<String>> table_view = new TableView<>();
@@ -35,14 +37,12 @@ public class ClientApp extends Application {
     @Override
     public void start(Stage primary_stage) {
         try {
-            client_info = LoginPage.showLoginPage();
+            actual_client = new ActualClient("localhost", 8080);
+            client_info = LoginPage.showLoginPage(actual_client);
         } catch (Exception e) {
             e.printStackTrace();
             return;
         }
-
-        System.out.println("Got id: " + client_info.user_id);
-        System.out.println("Got password: " + client_info.password);
 
         showAppStage(primary_stage);
     }
@@ -72,16 +72,15 @@ public class ClientApp extends Application {
     private void loadTable(String table_name) {
         new Thread(() -> {
             try {
-                String responce_body = ActualClient.sendRequest(
-                    new Message(
-                        1,
-                        client_info.user_id,
-                        client_info.password +
-                            "%%%" +
-                            table_name +
-                            ";;;;;;1000;;;0;;;;;;false"
+                String responce_body = actual_client
+                    .sendRequest(
+                        new Message(
+                            1,
+                            client_info.user_id,
+                            table_name + ";;;;;;1000;;;0;;;;;;false"
+                        )
                     )
-                ).message;
+                    .message;
 
                 if (responce_body == null) return;
 

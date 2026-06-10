@@ -12,7 +12,7 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
 
     private QueueManager queueManager;
     private Connection connection;
-    private NetContext context;
+    private AppContext<Message> context;
 
     public Processor(QueueManager queueManager, String db_name) {
         this.queueManager = queueManager;
@@ -22,19 +22,19 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
     public void run() {
         try {
             while (true) {
-                Tuple<Message> in = queueManager.processor_queue.take();
-                context = in.context;
+                context = queueManager.processor_queue.take();
+
                 try {
-                    process(in.data);
+                    process(context.data);
                 } catch (Exception e) {
                     System.err.println("Processing failed: " + e.getMessage());
                     Message response = new Message();
-                    response.command_id = in.data.command_id;
-                    response.user_id = in.data.user_id;
+                    response.command_id = context.data.command_id;
+                    response.user_id = context.data.user_id;
                     response.message = "ERROR: " + e.getMessage();
                     try {
                         queueManager.encrypt_queue.put(
-                            new Tuple<>(response, context)
+                            new NeworkPair<>(response, context.net_context)
                         );
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
@@ -52,33 +52,6 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         responce.user_id = message.user_id;
         responce.message = "OK";
 
-        //Credentials%%%password%%%data
-        String[] process_string = message.message.split("%%%");
-
-        //Auth user
-        if (message.command_id == 0) {
-            String auth = checkAuthLogin(process_string[0], process_string[1]);
-            responce.message = auth;
-            sendMessage(responce);
-
-            return;
-        }
-
-        String auth = checkAuth(message.user_id, process_string[0]);
-
-        if (auth.equals("Failed auth")) {
-            System.out.println("Failed auth with id: " + message.user_id);
-            System.out.println(
-                "Failed auth with passowrd: " + process_string[0]
-            );
-
-            responce.message = auth;
-
-            sendMessage(responce);
-
-            return;
-        }
-
         //TODO: ALL THAT NEEDS TO BE REFACTORED INTO DIFFERENT FUNCTIONS
 
         // Maybe add auth to this when we execute command check for the right
@@ -87,7 +60,7 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
             // Get the table cause, I mean, that is what you sometimes have to do, yeah,
             // imagine, crazy, that's just incredible, truly an unforgettable experience
 
-            DBContext db_context = createDBContext(process_string[1]);
+            DBContext db_context = createDBContext(message.message);
 
             try (
                 PreparedStatement ps = connection.prepareStatement(
@@ -147,10 +120,10 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
             // context
 
             DBObjectContext object_context = createDBObjectContext(
-                process_string[1]
+                message.message
             );
 
-            if (!verifyPermissions(auth, object_context.table)) {
+            if (!verifyPermissions(context.user_role, object_context.table)) {
                 responce.message = "Operation not permitted";
                 sendMessage(responce);
 
@@ -194,10 +167,10 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         // Insert is 3
         else if (message.command_id == 3) {
             DBObjectContext object_context = createDBObjectContext(
-                process_string[1]
+                message.message
             );
 
-            if (!verifyPermissions(auth, object_context.table)) {
+            if (!verifyPermissions(context.user_role, object_context.table)) {
                 responce.message = "Operation not permitted";
                 sendMessage(responce);
 
@@ -232,10 +205,10 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         // Add 4 as an update
         else if (message.command_id == 4) {
             DBObjectContext object_context = createDBObjectContext(
-                process_string[1]
+                message.message
             );
 
-            if (!verifyPermissions(auth, object_context.table)) {
+            if (!verifyPermissions(context.user_role, object_context.table)) {
                 responce.message = "Operation not permitted";
                 sendMessage(responce);
 
@@ -270,7 +243,7 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                 "\nUser_id: " +
                 message.user_id +
                 "\nMessage: " +
-                process_string[1]
+                message.message
         );
 
         sendMessage(responce);
@@ -288,7 +261,7 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
     private void sendMessage(Message message) {
         try {
             queueManager.encrypt_queue.put(
-                new Tuple<Message>(message, context)
+                new NeworkPair<Message>(message, context.net_context)
             );
 
             return;
@@ -353,14 +326,14 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         );
     }
 
-    private String checkAuthLogin(String empl_credentials, String password) {
+    public String handleLogin(String credentials) {
         try (
             PreparedStatement ps = connection.prepareStatement(
                 "select id_employee, empl_role from Employee where (empl_surname || ' ' || empl_name) = ? and password = ?"
             )
         ) {
-            ps.setString(1, empl_credentials);
-            ps.setString(2, password);
+            ps.setString(1, credentials.split("%%%")[0]);
+            ps.setString(2, credentials.split("%%%")[1]);
 
             ResultSet rs = ps.executeQuery();
 
@@ -370,27 +343,6 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                     "%%%" +
                     rs.getString("empl_role")
                 );
-            } else {
-                return "Failed auth";
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed Auth: " + e.getMessage());
-        }
-    }
-
-    private String checkAuth(int empl_id, String password) {
-        try (
-            PreparedStatement ps = connection.prepareStatement(
-                "select empl_role from Employee where id_employee = ? and password = ?"
-            )
-        ) {
-            ps.setString(1, String.valueOf(empl_id));
-            ps.setString(2, password);
-
-            ResultSet rs = ps.executeQuery();
-
-            if (rs.next()) {
-                return rs.getString("empl_role");
             } else {
                 return "Failed auth";
             }

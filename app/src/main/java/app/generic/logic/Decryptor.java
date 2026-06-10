@@ -1,12 +1,10 @@
 package app.generic.logic;
 
+import app.generic.helpers.AppContext;
 import app.generic.helpers.Crc16;
 import app.generic.helpers.Message;
-import app.generic.helpers.NetContext;
-import app.generic.helpers.Tuple;
 import app.generic.interfaces.IDecryptor;
 import app.server.logic.QueueManager;
-
 import java.nio.ByteBuffer;
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
@@ -14,19 +12,21 @@ import javax.crypto.spec.SecretKeySpec;
 public class Decryptor implements IDecryptor, Runnable {
 
     private QueueManager queueManager;
-    private NetContext context;
+    private AppContext<byte[]> context;
 
     public Decryptor(QueueManager queueManager) {
         this.queueManager = queueManager;
     }
 
+    public Decryptor() {}
+
     public void run() {
         try {
             while (true) {
-                Tuple<byte[]> in = queueManager.decrypt_queue.take();
-                context = in.context;
+                context = queueManager.decrypt_queue.take();
+
                 try {
-                    decrypt(in.data);
+                    decrypt(context.data);
                 } catch (Exception e) {
                     System.err.println("Decryption failed: " + e.getMessage());
                 }
@@ -39,8 +39,9 @@ public class Decryptor implements IDecryptor, Runnable {
     String decryptInnerMessage(byte[] bytes) {
         try {
             SecretKeySpec key = new SecretKeySpec(
-                    "1234567890123456".getBytes(),
-                    "AES");
+                "1234567890123456".getBytes(),
+                "AES"
+            );
             Cipher cipher = Cipher.getInstance("AES");
             cipher.init(Cipher.DECRYPT_MODE, key);
 
@@ -108,8 +109,12 @@ public class Decryptor implements IDecryptor, Runnable {
 
         try {
             queueManager.processor_queue.put(
-                    // That was not full message lol
-                    new Tuple<Message>(full_message, context));
+                new AppContext<Message>(
+                    full_message,
+                    context.user_role,
+                    context.net_context
+                )
+            );
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }

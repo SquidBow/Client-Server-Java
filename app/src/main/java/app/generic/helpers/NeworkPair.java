@@ -1,11 +1,11 @@
 package app.generic.helpers;
 
-public class Tuple<T> {
+public class NeworkPair<T> {
 
     public final T data;
     public final NetContext context;
 
-    public Tuple(T data, NetContext context) {
+    public NeworkPair(T data, NetContext context) {
         this.data = data;
         this.context = context;
     }

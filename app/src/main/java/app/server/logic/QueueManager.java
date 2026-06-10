@@ -1,13 +1,16 @@
 package app.server.logic;
 
-import app.generic.helpers.Message;
-import app.generic.helpers.Tuple;
+import app.generic.helpers.*;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class QueueManager {
 
-    public LinkedBlockingQueue<Tuple<byte[]>> decrypt_queue = new LinkedBlockingQueue<>();
-    public LinkedBlockingQueue<Tuple<Message>> processor_queue = new LinkedBlockingQueue<>();
-    public LinkedBlockingQueue<Tuple<Message>> encrypt_queue = new LinkedBlockingQueue<>();
-    public LinkedBlockingQueue<Tuple<byte[]>> sender_queue = new LinkedBlockingQueue<>();
+    public LinkedBlockingQueue<AppContext<byte[]>> decrypt_queue =
+        new LinkedBlockingQueue<>();
+    public LinkedBlockingQueue<AppContext<Message>> processor_queue =
+        new LinkedBlockingQueue<>();
+    public LinkedBlockingQueue<NeworkPair<Message>> encrypt_queue =
+        new LinkedBlockingQueue<>();
+    public LinkedBlockingQueue<NeworkPair<byte[]>> sender_queue =
+        new LinkedBlockingQueue<>();
 }

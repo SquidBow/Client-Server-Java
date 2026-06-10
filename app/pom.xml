@@ -6,8 +6,8 @@
 >
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>ua.edu.ukma.fin</groupId>
-    <artifactId>pracice-1-sample</artifactId>
+    <groupId>SquidBow</groupId>
+    <artifactId>Client-Server-App</artifactId>
     <version>1.0-SNAPSHOT</version>
 
     <properties>
