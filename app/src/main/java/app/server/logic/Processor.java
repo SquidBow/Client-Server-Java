@@ -69,8 +69,8 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
             ) {
                 int i = 1;
 
-                for (String f : db_context.filters)
-                    ps.setObject(i++, f.split("&&&")[1]);
+                for (String filter : db_context.filters)
+                    ps.setObject(i++, filter.split("&&&")[1]);
 
                 ps.setObject(i++, db_context.limit);
                 ps.setObject(i++, db_context.offset);
@@ -88,7 +88,8 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                     if (col_name.equals("password")) continue;
 
                     if (col > 1) responce.message += (":::");
-                    responce.message += col_name;
+                    responce.message +=
+                        col_name + "&&&" + meta_data.getColumnTypeName(col);
                 }
 
                 while (rs.next()) {

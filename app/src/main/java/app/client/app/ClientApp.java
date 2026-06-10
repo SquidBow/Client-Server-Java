@@ -32,6 +32,7 @@ public class ClientApp extends Application {
     ActualClient actual_client;
 
     private static ClientInfo client_info;
+    private Map<String, String> columns = new HashMap<>();
 
     private TableView<ObservableList<String>> table_view = new TableView<>();
 
@@ -98,13 +99,24 @@ public class ClientApp extends Application {
                 String[] data = responce_body.split(";;;");
                 if (data.length == 0) return;
 
-                String[] columns = data[0].split(":::");
-                List<TableColumn<ObservableList<String>, String>> col_names =
-                    new ArrayList<>();
+                String[] col_names = new String[data[0].split(":::").length];
 
-                for (int i = 0; i < columns.length; i++) {
+                int index = 0;
+
+                for (String col_specs : data[0].split(":::")) {
+                    String[] col_parts = col_specs.split("&&&");
+                    columns.put(col_parts[0], col_parts[1]);
+
+                    col_names[index++] = col_parts[0];
+                }
+
+                List<
+                    TableColumn<ObservableList<String>, String>
+                > table_col_objects = new ArrayList<>();
+
+                for (int i = 0; i < col_names.length; i++) {
                     TableColumn<ObservableList<String>, String> tc =
-                        new TableColumn<>(columns[i]);
+                        new TableColumn<>(col_names[i]);
 
                     int stupid_ass_final_i_shut_up_now = i;
 
@@ -117,7 +129,7 @@ public class ClientApp extends Application {
                     //Flags
                     tc.setStyle("-fx-alignment: CENTER;");
 
-                    col_names.add(tc);
+                    table_col_objects.add(tc);
                 }
 
                 List<ObservableList<String>> rows = new ArrayList<>();
@@ -135,7 +147,7 @@ public class ClientApp extends Application {
                         TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN
                     );
 
-                    table_view.getColumns().setAll(col_names);
+                    table_view.getColumns().setAll(table_col_objects);
 
                     table_view.getItems().setAll(rows);
                 });
