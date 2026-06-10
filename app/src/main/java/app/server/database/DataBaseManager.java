@@ -1,7 +1,7 @@
 package app.server.database;
 
 import app.generic.helpers.DBContext;
-import app.generic.interfaces.IDBObject;
+import app.generic.objects.GenericObject;
 import java.sql.*;
 import java.util.Map;
 
@@ -206,7 +206,10 @@ public class DataBaseManager {
         return sql;
     }
 
-    public static String createInsertStatement(String table, IDBObject object) {
+    public static String createInsertStatement(
+        String table,
+        GenericObject object
+    ) {
         String sql = "insert into \"" + table + "\" (";
 
         for (String key : object.getMap().keySet()) {
@@ -225,11 +228,14 @@ public class DataBaseManager {
         return sql;
     }
 
-    public static String createUpdateStatement(String table, IDBObject object) {
+    public static String createUpdateStatement(
+        String table,
+        GenericObject object
+    ) {
         String sql = "update \"" + table + "\" set ";
 
         for (Map.Entry<String, Object> entry : object.getMap().entrySet()) {
-            if (!entry.getKey().equals(object.getPrimaryKey())) {
+            if (!entry.getKey().equals(object.primary_key)) {
                 sql += entry.getKey() + " = ?, ";
             }
         }
@@ -237,19 +243,18 @@ public class DataBaseManager {
         sql =
             sql.substring(0, sql.length() - 2) +
             " where " +
-            object.getPrimaryKey() +
+            object.primary_key +
             " = ?";
 
         return sql;
     }
 
-    public static String createDeleteStatement(String table, IDBObject object) {
+    public static String createDeleteStatement(
+        String table,
+        GenericObject object
+    ) {
         return (
-            "delete from \"" +
-            table +
-            "\" where " +
-            object.getPrimaryKey() +
-            " = ?"
+            "delete from \"" + table + "\" where " + object.primary_key + " = ?"
         );
     }
 

@@ -1,8 +1,9 @@
 package app.client.app;
 
 import app.client.app.LoginPage.ClientInfo;
+import app.client.helpers.DataBaseHelpers;
 import app.client.network.tcp.ActualClient;
-import app.generic.helpers.Message;
+import app.generic.helpers.*;
 import java.util.*;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -44,10 +45,10 @@ public class ClientApp extends Application {
             return;
         }
 
-        showAppStage(primary_stage);
+        showTablePage(primary_stage);
     }
 
-    private void showAppStage(Stage primary_stage) {
+    private void showTablePage(Stage primary_stage) {
         ComboBox<String> table_selector = new ComboBox<>();
         table_selector.getItems().addAll(TABLES);
         table_selector.setValue(TABLES[0]);
@@ -77,7 +78,16 @@ public class ClientApp extends Application {
                         new Message(
                             1,
                             client_info.user_id,
-                            table_name + ";;;;;;1000;;;0;;;;;;false"
+                            DataBaseHelpers.encodeDBContext(
+                                new DBContext(
+                                    table_name,
+                                    new String[0],
+                                    1000,
+                                    0,
+                                    null,
+                                    false
+                                )
+                            )
                         )
                     )
                     .message;

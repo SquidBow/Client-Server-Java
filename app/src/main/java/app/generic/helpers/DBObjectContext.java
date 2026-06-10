@@ -1,13 +1,13 @@
 package app.generic.helpers;
 
-import app.generic.interfaces.IDBObject;
+import app.generic.objects.GenericObject;
 
 public class DBObjectContext {
 
     public String table;
-    public IDBObject object;
+    public GenericObject object;
 
-    public DBObjectContext(String table, IDBObject object) {
+    public DBObjectContext(String table, GenericObject object) {
         this.table = table;
         this.object = object;
     }
