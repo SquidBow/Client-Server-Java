@@ -126,13 +126,13 @@ public class DataBaseManager {
                         stmt.execute(
                             """
                             INSERT INTO Employee (id_employee, empl_surname, empl_name, empl_role, salary, date_of_birth, date_of_start, phone_number, city, street, zip_code, password)
-                            VALUES ('1', 'Admin', 'Admin', 'Manager', 10000, '1990-01-01', '2020-01-01', '+380000000000', 'Kyiv', 'Central', '01001', 'admin');
+                            VALUES ('1', 'Admin', 'Admin', 'Manager', 10000, '1990-01-01', '2020-01-01', '+380000000000', 'Kyiv', 'Central', '01001', '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918');
                             """
                         );
                         stmt.execute(
                             """
                             INSERT INTO Employee (id_employee, empl_surname, empl_name, empl_role, salary, date_of_birth, date_of_start, phone_number, city, street, zip_code, password)
-                            VALUES ('2', 'User', 'User', 'Cashier', 5000, '1995-01-01', '2021-01-01', '+380000000001', 'Kyiv', 'Side', '01002', 'user');
+                            VALUES ('2', 'User', 'User', 'Cashier', 5000, '1995-01-01', '2021-01-01', '+380000000001', 'Kyiv', 'Side', '01002', '04f8996da763b7a969b1028ee3007569eaf3a635486ddab211d512c85b9df8fb');
                             """
                         );
                         System.out.println(
