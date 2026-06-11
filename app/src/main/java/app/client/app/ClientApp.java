@@ -1,7 +1,8 @@
 package app.client.app;
 
-import app.client.app.LoginPage.ClientInfo;
+import app.client.helpers.ClientInfo;
 import app.client.helpers.DataBaseHelpers;
+import app.client.helpers.RequestFilter;
 import app.client.network.tcp.ActualClient;
 import app.generic.helpers.*;
 import java.util.*;
@@ -29,10 +30,13 @@ public class ClientApp extends Application {
         "Store_Product",
     };
 
+    private boolean DEBUG = true;
+
     ActualClient actual_client;
 
     private static ClientInfo client_info;
     private Map<String, String> columns = new HashMap<>();
+    private Map<String, List<RequestFilter>> table_filters = new HashMap<>();
 
     private TableView<ObservableList<String>> table_view = new TableView<>();
 
@@ -40,7 +44,17 @@ public class ClientApp extends Application {
     public void start(Stage primary_stage) {
         try {
             actual_client = new ActualClient("localhost", 8080);
-            client_info = LoginPage.showLoginPage(actual_client);
+
+            if (DEBUG) {
+                client_info = LoginPage.sendRequest(
+                    actual_client,
+                    "Admin",
+                    "Admin",
+                    "admin"
+                );
+            } else {
+                client_info = LoginPage.showLoginPage(actual_client);
+            }
         } catch (Exception e) {
             e.printStackTrace();
             return;
@@ -54,7 +68,18 @@ public class ClientApp extends Application {
         table_selector.getItems().addAll(TABLES);
         table_selector.setValue(TABLES[0]);
 
-        HBox top_bar = new HBox(10, new Label("Table:"), table_selector);
+        Button filter_button = new Button("Filters");
+        filter_button.setOnAction(e -> {
+            showFilterWindow(table_selector.getValue());
+        });
+
+        HBox top_bar = new HBox(
+            10,
+            new Label("Table:"),
+            table_selector,
+            filter_button
+        );
+
         top_bar.setPadding(new Insets(10));
 
         BorderPane root = new BorderPane();
@@ -126,6 +151,31 @@ public class ClientApp extends Application {
                         )
                     );
 
+                    // tc.setCellFactory(f -> {
+                    //     TableCell<ObservableList<String>, String> cell =
+                    //         new TableCell<>() {
+                    //             @Override
+                    //             protected void updateItem(
+                    //                 String item,
+                    //                 boolean empty
+                    //             ) {
+                    //                 super.updateItem(item, empty);
+                    //                 setText(empty ? null : item);
+                    //             }
+                    //         };
+
+                    //     // cell.setOnContextMenuRequested(e -> {
+                    //         //TODO add filters stuff
+
+                    //         // ContextMenu menu = new ContextMenu();
+                    //         // menu.getItems().add(e)
+
+                    //         // menu.show(cell, e.getScreenX(), e.getScreenY());
+                    //     // });
+
+                    //     return cell;
+                    // });
+
                     //Flags
                     tc.setStyle("-fx-alignment: CENTER;");
 
@@ -156,4 +206,117 @@ public class ClientApp extends Application {
             }
         }).start();
     }
+
+    private void showFilterWindow(String table_name) {
+        //TODO load existing filters
+
+        Stage filter_stage = new Stage();
+        VBox root = new VBox(10);
+
+        List<RequestFilter> filters = table_filters.get(table_name);
+
+        if (filters != null) {
+            for (RequestFilter filter : filters) {
+                String col_type = columns.get(filter.col);
+
+                ComboBox<String> cols = new ComboBox<>(
+                    FXCollections.observableArrayList(columns.keySet())
+                );
+
+                TextField filter_val = new TextField(filter.val);
+
+                ComboBox<String> filter_special = new ComboBox<>(
+                    FXCollections.observableArrayList(
+                        getSpecialOptions(col_type)
+                    )
+                );
+
+                filter_special.setValue(filter.mode);
+
+                HBox filter_box = new HBox(
+                    10,
+                    cols,
+                    filter_val,
+                    filter_special
+                );
+                root.getChildren().add(filter_box);
+            }
+        }
+
+        Button add_btn = new Button("+ Add filter");
+
+        add_btn.setOnAction(e -> {
+            ComboBox<String> cols = new ComboBox<>(
+                FXCollections.observableArrayList(columns.keySet())
+            );
+
+            cols.setValue(columns.keySet().iterator().next());
+
+            TextField val = new TextField();
+
+            ComboBox<String> spec = new ComboBox<>(
+                FXCollections.observableArrayList(
+                    getSpecialOptions(columns.get(cols.getValue()))
+                )
+            );
+
+            spec.setValue(spec.getItems().get(0));
+
+            cols.valueProperty().addListener((obs, old, newCol) -> {
+                String type = columns.get(newCol);
+
+                spec.getItems().setAll(getSpecialOptions(type));
+                spec.setValue(spec.getItems().get(0));
+            });
+
+            HBox row = new HBox(10, cols, spec, val);
+            root.getChildren().add(root.getChildren().size() - 1, row);
+        });
+
+        root.getChildren().add(add_btn);
+
+        filter_stage.setScene(new Scene(root, 400, 300));
+        filter_stage.show();
+    }
+
+    private String[] getSpecialOptions(String col_type) {
+        if (col_type.equals("INTEGER") || col_type.equals("REAL")) {
+            return new String[] { "<=", "=", ">=" };
+        } else if (col_type.equals("TEXT")) {
+            return new String[] { "Like", "Exact" };
+        } else if (col_type.equals("DATE")) {
+            return new String[] { "Start", "End" };
+        }
+
+        return null;
+    }
 }
+
+// if (column_type.equals("INTEGER") || column_type.equals("REAL")) {
+//     context_menu.getItems().add(createCustomTextBox("Enter the value"));
+//     ToggleGroup group = new ToggleGroup();
+//     RadioMenuItem equal = new RadioMenuItem("=");
+//     RadioMenuItem greater_equal = new RadioMenuItem(">=");
+//     RadioMenuItem less_equal = new RadioMenuItem("<=");
+//     equal.setToggleGroup(group);
+//     greater_equal.setToggleGroup(group);
+//     less_equal.setToggleGroup(group);
+//     equal.setSelected(true);
+//     Menu mode_submenu = new Menu("Select mode");
+//     mode_submenu.getItems().addAll(equal, greater_equal, less_equal);
+//     context_menu.getItems().add(mode_submenu);
+// } else if (column_type.equals("TEXT")) {
+//     context_menu.getItems().add(createCustomTextBox("Enter the value"));
+//     ToggleGroup text_group = new ToggleGroup();
+//     RadioMenuItem exact = new RadioMenuItem("exact");
+//     RadioMenuItem contains = new RadioMenuItem("contains");
+//     exact.setToggleGroup(text_group);
+//     contains.setToggleGroup(text_group);
+//     contains.setSelected(true);
+//     Menu text_submenu = new Menu("Select mode");
+//     text_submenu.getItems().addAll(exact, contains);
+//     context_menu.getItems().add(text_submenu);
+// }
+// // else if (column_type.equals("DATE")) {
+// //     HBox
+// // }

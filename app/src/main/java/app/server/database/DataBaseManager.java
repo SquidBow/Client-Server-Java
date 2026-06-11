@@ -44,8 +44,8 @@ public class DataBaseManager {
                     empl_patronymic TEXT,
                     empl_role TEXT NOT NULL,
                     salary REAL NOT NULL,
-                    date_of_birth TEXT NOT NULL,
-                    date_of_start TEXT NOT NULL,
+                    date_of_birth DATE NOT NULL,
+                    date_of_start DATE NOT NULL,
                     phone_number TEXT NOT NULL,
                     city TEXT NOT NULL,
                     street TEXT NOT NULL,
@@ -74,7 +74,7 @@ public class DataBaseManager {
                     check_number TEXT PRIMARY KEY,
                     id_employee TEXT NOT NULL,
                     card_number TEXT,
-                    print_date TEXT NOT NULL,
+                    print_date DATE NOT NULL,
                     sum_total REAL NOT NULL,
                     vat REAL NOT NULL,
                     FOREIGN KEY (id_employee) REFERENCES Employee(id_employee)
@@ -147,40 +147,6 @@ public class DataBaseManager {
             e.printStackTrace();
             throw new RuntimeException("Database initialization failed", e);
         }
-    }
-
-    // Since filters are gona be created on the client need to pass in the value to
-    // the use later
-    public static String createFilterStatement(
-        String column,
-        String word,
-        boolean exact
-    ) {
-        String sql = " and " + column;
-
-        if (exact) {
-            sql += " = ?";
-        } else {
-            sql += " like ?";
-        }
-
-        return sql + "&&&%" + word + "%";
-    }
-
-    public static String createFilterStatement(
-        String column,
-        int val,
-        boolean minimum
-    ) {
-        String sql = " and " + column;
-
-        if (minimum) {
-            sql += " >= ?";
-        } else {
-            sql += " <= ?";
-        }
-
-        return sql + "&&&" + String.valueOf(val);
     }
 
     public static String createSelectStatement(DBContext context) {

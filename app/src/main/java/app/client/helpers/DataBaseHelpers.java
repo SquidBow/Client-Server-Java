@@ -36,4 +36,38 @@ public class DataBaseHelpers {
 
         return String.join(";;;", table, primary_key, map);
     }
+
+    // Since filters are gona be created on the client need to pass in the value to
+    // the use later
+    public static String createFilterStatement(
+        String column,
+        String word,
+        boolean exact
+    ) {
+        String sql = " and " + column;
+
+        if (exact) {
+            sql += " = ?";
+        } else {
+            sql += " like ?";
+        }
+
+        return sql + "&&&%" + word + "%";
+    }
+
+    public static String createFilterStatement(
+        String column,
+        int val,
+        boolean minimum
+    ) {
+        String sql = " and " + column;
+
+        if (minimum) {
+            sql += " >= ?";
+        } else {
+            sql += " <= ?";
+        }
+
+        return sql + "&&&" + String.valueOf(val);
+    }
 }

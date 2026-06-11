@@ -11,12 +11,31 @@ import java.nio.ByteBuffer;
 
 public class ActualClient {
 
-    private static Socket socket;
+    private static Socket socket = null;
     private static InputStream in;
     private static OutputStream out;
 
     public ActualClient(String host, int port) throws IOException {
-        socket = new Socket(host, port);
+        int retries = 5;
+
+        while (socket == null) {
+            try {
+                socket = new Socket(host, port);
+            } catch (IOException e) {
+                if (retries > 0) {
+                    System.out.println("Unable to connect retrying");
+
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException interrupt) {
+                        interrupt.printStackTrace();
+                    }
+
+                    retries -= 1;
+                } else throw e;
+            }
+        }
+
         in = socket.getInputStream();
         out = socket.getOutputStream();
     }
@@ -24,6 +43,8 @@ public class ActualClient {
     public Message sendRequest(Message request) throws Exception {
         Encryptor encryptor = new Encryptor();
         byte[] packet = encryptor.encrypt(request);
+
+        // System.out.println("Bytes sent: " + packet.length);
 
         out.write(packet);
         out.flush();

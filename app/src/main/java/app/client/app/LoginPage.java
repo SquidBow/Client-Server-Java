@@ -1,5 +1,6 @@
 package app.client.app;
 
+import app.client.helpers.ClientInfo;
 import app.client.network.tcp.ActualClient;
 import app.generic.helpers.Message;
 import java.security.MessageDigest;
@@ -13,21 +14,13 @@ import javafx.stage.Stage;
 
 public class LoginPage {
 
-    public static class ClientInfo {
-
-        int user_id;
-        String empl_role;
-
-        public ClientInfo(int user_id, String empl_role) {
-            this.user_id = user_id;
-            this.empl_role = empl_role;
-        }
-    }
-
     public static ClientInfo showLoginPage(ActualClient actual_client)
         throws Exception {
-        TextField empl_name = new TextField("Enter your name");
-        TextField empl_surname = new TextField("Enter your surname");
+        TextField empl_name = new TextField();
+        empl_name.setPromptText("Enter your name");
+
+        TextField empl_surname = new TextField();
+        empl_surname.setPromptText("Enter your surname");
 
         PasswordField password = new PasswordField();
         Button login = new Button("Login");
@@ -36,32 +29,17 @@ public class LoginPage {
         ClientInfo[] client_info = new ClientInfo[1];
 
         login.setOnAction(e -> {
-            //Hash the password
-            String encrypted_password = password.getText();
-
             try {
-                Message request = new Message(
-                    0,
-                    0,
-                    empl_name.getText() +
-                        " " +
-                        empl_surname.getText() +
-                        "%%%" +
-                        encrypted_password
-                );
-
-                Message responce = actual_client.sendRequest(request);
-
-                if (responce.message.equals("Failed auth")) return;
-
-                client_info[0] = new ClientInfo(
-                    Integer.valueOf(responce.message.split("%%%")[0]),
-                    responce.message.split("%%%")[1]
+                client_info[0] = sendRequest(
+                    actual_client,
+                    empl_name.getText(),
+                    empl_surname.getText(),
+                    password.getText()
                 );
 
                 stage.close();
-            } catch (Exception exception) {
-                exception.printStackTrace();
+            } catch (Exception error) {
+                error.printStackTrace();
             }
         });
 
@@ -72,6 +50,30 @@ public class LoginPage {
         stage.showAndWait();
 
         return client_info[0];
+    }
+
+    public static ClientInfo sendRequest(
+        ActualClient actual_client,
+        String empl_name,
+        String empl_surname,
+        String password
+    ) throws Exception {
+        String encrypted_password = hashPassword(password);
+
+        Message request = new Message(
+            0,
+            0,
+            empl_name + " " + empl_surname + "%%%" + encrypted_password
+        );
+
+        Message responce = actual_client.sendRequest(request);
+
+        if (responce.message.equals("Failed auth")) return null;
+
+        return new ClientInfo(
+            Integer.valueOf(responce.message.split("%%%")[0]),
+            responce.message.split("%%%")[1]
+        );
     }
 
     public static String hashPassword(String password) {
