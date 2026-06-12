@@ -131,7 +131,7 @@ public class StoreServerTCP extends Thread {
         byte[] buffer = new byte[1024];
 
         int bytes_read = in.readNBytes(buffer, 0, 16);
-        System.out.println("decryptLogin read: " + bytes_read + " bytes");
+        // System.out.println("decryptLogin read: " + bytes_read + " bytes");
 
         if (bytes_read < 16) {
             throw new IOException("Less bytes then expected");

@@ -39,7 +39,7 @@ public class DataBaseHelpers {
 
     // Since filters are gona be created on the client need to pass in the value to
     // the use later
-    public static String createFilterStatement(
+    public static String createFilterStatementWord(
         String column,
         String word,
         boolean exact
@@ -48,26 +48,51 @@ public class DataBaseHelpers {
 
         if (exact) {
             sql += " = ?";
+
+            return sql + "&&&" + word + "";
         } else {
             sql += " like ?";
-        }
 
-        return sql + "&&&%" + word + "%";
+            return sql + "&&&%" + word + "%";
+        }
     }
 
-    public static String createFilterStatement(
+    public static String createFilterStatementInteger(
         String column,
-        int val,
-        boolean minimum
+        String val,
+        String mode
     ) {
         String sql = " and " + column;
 
-        if (minimum) {
+        sql += " " + mode + " ?";
+
+        return sql + "&&&" + val;
+    }
+
+    //So it doesn't habe to translate into int and back to string
+    public static String createFilterStatementDate(
+        String column,
+        String val,
+        String mode
+    ) {
+        String sql = " and " + column;
+
+        if (mode.equals("Start")) {
             sql += " >= ?";
         } else {
             sql += " <= ?";
         }
 
-        return sql + "&&&" + String.valueOf(val);
+        java.time.format.DateTimeFormatter inputFormat =
+            java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy");
+
+        java.time.format.DateTimeFormatter dbFormat =
+            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+        String dbDate = java.time.LocalDate.parse(val, inputFormat).format(
+            dbFormat
+        );
+
+        return sql + "&&&" + dbDate;
     }
 }
