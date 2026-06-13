@@ -3,6 +3,7 @@ package app.client.app;
 import static app.client.helpers.Conversions.*;
 
 import app.client.helpers.ClientInfo;
+import app.client.helpers.ColumnData;
 import app.client.helpers.DataBaseHelpers;
 import app.client.helpers.RequestFilter;
 import app.client.network.tcp.ActualClient;
@@ -23,27 +24,49 @@ import javafx.stage.Stage;
 public class ClientApp extends Application {
 
     final int PORT = 8080;
-    static final String[] TABLES = {
-        "Category",
-        "Check",
-        "Customer_Card",
-        "Employee",
-        "Product",
-        "Sale",
-        "Store_Product",
-    };
+    // static final String[] TABLES = {
+    //     "Category",
+    //     "Check",
+    //     "Customer_Card",
+    //     "Employee",
+    //     "Product",
+    //     "Sale",
+    //     "Store_Product",
+    // };
 
-    private boolean DEBUG = true;
+    private static final Map<String, String> TABLES = Map.of(
+        "Category",
+        "category_number",
+
+        "Check",
+        "check_number",
+
+        "Customer_Card",
+        "card_number",
+
+        "Employee",
+        "id_employee",
+
+        "Product",
+        "id_product",
+
+        "Sale",
+        "UPC",
+
+        "Store_Product",
+        "UPC"
+    );
+
+    private String first_table = "Employee";
+    private static ClientInfo client_info;
+    private List<ColumnData> columns = new ArrayList<>();
+    private String[] column_names = new String[0];
+    private Map<String, List<RequestFilter>> filters = new HashMap<>();
+    private TableView<ObservableList<String>> table_view = new TableView<>();
 
     ActualClient actual_client;
 
-    private static ClientInfo client_info;
-    private Map<String, String> columns = new HashMap<>();
-    private Map<String, List<RequestFilter>> filters = new HashMap<>();
-
-    private TableView<ObservableList<String>> table_view = new TableView<>();
-
-    private String column = TABLES[3];
+    private boolean DEBUG = true;
 
     @Override
     public void start(Stage primary_stage) {
@@ -69,21 +92,42 @@ public class ClientApp extends Application {
     }
 
     private void showTablePage(Stage primary_stage) {
+        //Table selector
         ComboBox<String> table_selector = new ComboBox<>();
-        table_selector.getItems().addAll(TABLES);
-        table_selector.setValue(column);
+        table_selector.getItems().addAll(TABLES.keySet());
+        table_selector.setValue(first_table);
 
+        //Filter button
         Button filter_button = new Button("Filters");
         filter_button.setOnAction(e -> {
             showFilterWindow(table_selector.getValue());
         });
 
-        HBox top_bar = new HBox(
-            10,
-            new Label("Table:"),
-            table_selector,
-            filter_button
-        );
+        HBox top_bar;
+
+        //TODO INSERT BUTTON
+        if (
+            client_info.role.equals("Manager") ||
+            first_table.equals("Sale") ||
+            first_table.equals("Check") ||
+            first_table.equals("Customer_Card")
+        ) {
+            // Button insert_button = new Button("Insert a new row");
+
+            top_bar = new HBox(
+                10,
+                new Label("Table:"),
+                table_selector,
+                filter_button
+            );
+        } else {
+            top_bar = new HBox(
+                10,
+                new Label("Table:"),
+                table_selector,
+                filter_button
+            );
+        }
 
         top_bar.setPadding(new Insets(10));
 
@@ -95,7 +139,7 @@ public class ClientApp extends Application {
             if (new_val != null) loadTable(new_val);
         });
 
-        loadTable(column);
+        loadTable(first_table);
 
         primary_stage.setScene(new Scene(root, 900, 600));
         primary_stage.show();
@@ -104,55 +148,17 @@ public class ClientApp extends Application {
     private void loadTable(String table_name) {
         new Thread(() -> {
             try {
-                List<String> all_filters = new ArrayList<>();
-                List<RequestFilter> table_filters = filters.get(table_name);
-
-                if (table_filters != null) {
-                    for (RequestFilter filter : table_filters) {
-                        String filter_string = "";
-                        String filter_type = columns.get(filter.col);
-
-                        if (
-                            filter_type.equals("INTEGER") ||
-                            filter_type.equals("REAL")
-                        ) {
-                            filter_string =
-                                DataBaseHelpers.createFilterStatementInteger(
-                                    filter.col,
-                                    filter.val,
-                                    filter.special
-                                );
-                        } else if (filter_type.equals("DATE")) {
-                            filter_string =
-                                DataBaseHelpers.createFilterStatementDate(
-                                    filter.col,
-                                    filter.val,
-                                    filter.special
-                                );
-                        } else if (filter_type.equals("TEXT")) {
-                            filter_string =
-                                DataBaseHelpers.createFilterStatementWord(
-                                    filter.col,
-                                    filter.val,
-                                    filter.special.equals("Exact")
-                                );
-                        }
-
-                        all_filters.add(filter_string);
-                    }
-                }
+                String[] table_filters = getFiltersForTable(table_name);
 
                 String responce_body = actual_client
                     .sendRequest(
                         new Message(
                             1,
-                            client_info.user_id,
+                            client_info.id,
                             DataBaseHelpers.encodeDBContext(
                                 new DBContext(
                                     table_name,
-                                    all_filters.size() == 0
-                                        ? new String[0]
-                                        : all_filters.toArray(new String[0]),
+                                    table_filters,
                                     1000,
                                     0,
                                     null,
@@ -169,69 +175,18 @@ public class ClientApp extends Application {
                 String[] data = responce_body.split(";;;");
                 if (data.length == 0) return;
 
-                String[] col_names = new String[data[0].split(":::").length];
-
-                int index = 0;
-
-                for (String col_specs : data[0].split(":::")) {
-                    String[] col_parts = col_specs.split("&&&");
-                    columns.put(col_parts[0], col_parts[1]);
-
-                    col_names[index++] = col_parts[0];
-                }
+                column_names = parseColumns(data[0]);
 
                 List<
                     TableColumn<ObservableList<String>, String>
-                > table_col_objects = new ArrayList<>();
+                > col_names_row = getColumnNamesRow(column_names);
 
-                for (int i = 0; i < col_names.length; i++) {
-                    TableColumn<ObservableList<String>, String> tc =
-                        new TableColumn<>(col_names[i]);
-
-                    int stupid_ass_final_i_shut_up_now = i;
-
-                    tc.setCellValueFactory(f ->
-                        new SimpleStringProperty(
-                            f.getValue().get(stupid_ass_final_i_shut_up_now)
-                        )
-                    );
-
-                    // tc.setCellFactory(f -> {
-                    //     TableCell<ObservableList<String>, String> cell =
-                    //         new TableCell<>() {
-                    //             @Override
-                    //             protected void updateItem(
-                    //                 String item,
-                    //                 boolean empty
-                    //             ) {
-                    //                 super.updateItem(item, empty);
-                    //                 setText(empty ? null : item);
-                    //             }
-                    //         };
-
-                    //     // cell.setOnContextMenuRequested(e -> {
-                    //         //TODO add filters stuff
-
-                    //         // ContextMenu menu = new ContextMenu();
-                    //         // menu.getItems().add(e)
-
-                    //         // menu.show(cell, e.getScreenX(), e.getScreenY());
-                    //     // });
-
-                    //     return cell;
-                    // });
-
-                    //Flags
-                    tc.setStyle("-fx-alignment: CENTER;");
-
-                    table_col_objects.add(tc);
-                }
-
+                //Get all rows
                 List<ObservableList<String>> rows = new ArrayList<>();
 
                 //Start from 1 cause [0] is the name of cols
                 for (int i = 1; i < data.length; i++) {
-                    String[] cells = data[i].split(":::", -1);
+                    String[] cells = data[i].split(":::");
 
                     rows.add(FXCollections.observableArrayList(cells));
                 }
@@ -242,7 +197,7 @@ public class ClientApp extends Application {
                         TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN
                     );
 
-                    table_view.getColumns().setAll(table_col_objects);
+                    table_view.getColumns().setAll(col_names_row);
 
                     table_view.getItems().setAll(rows);
                 });
@@ -250,6 +205,120 @@ public class ClientApp extends Application {
                 e.printStackTrace();
             }
         }).start();
+    }
+
+    private String[] parseColumns(String str) {
+        String[] data = str.split(":::");
+        String[] col_names = new String[data.length];
+
+        int index = 0;
+
+        for (String col_specs : data) {
+            String[] col_parts = col_specs.split("&&&");
+
+            //Add the name
+            col_names[index++] = col_parts[0];
+
+            //Add to the type map
+            columns.add(
+                new ColumnData(
+                    col_parts[0],
+                    col_parts[1],
+                    col_parts[2].equals("nullable")
+                )
+            );
+        }
+
+        return col_names;
+    }
+
+    private List<TableColumn<ObservableList<String>, String>> getColumnNamesRow(
+        String[] col_names
+    ) {
+        List<TableColumn<ObservableList<String>, String>> col_names_row =
+            new ArrayList<>();
+
+        for (int i = 0; i < col_names.length; i++) {
+            TableColumn<ObservableList<String>, String> tc = new TableColumn<>(
+                col_names[i]
+            );
+
+            int final_i = i;
+
+            tc.setCellValueFactory(f ->
+                new SimpleStringProperty(f.getValue().get(final_i))
+            );
+
+            // tc.setCellFactory(f -> {
+            //     TableCell<ObservableList<String>, String> cell =
+            //         new TableCell<>() {
+            //             @Override
+            //             protected void updateItem(
+            //                 String item,
+            //                 boolean empty
+            //             ) {
+            //                 super.updateItem(item, empty);
+            //                 setText(empty ? null : item);
+            //             }
+            //         };
+
+            //     // cell.setOnContextMenuRequested(e -> {
+            //         //TODO add filters stuff
+
+            //         // ContextMenu menu = new ContextMenu();
+            //         // menu.getItems().add(e)
+
+            //         // menu.show(cell, e.getScreenX(), e.getScreenY());
+            //     // });
+
+            //     return cell;
+            // });
+
+            //Flags
+            tc.setStyle("-fx-alignment: CENTER;");
+
+            col_names_row.add(tc);
+        }
+
+        return col_names_row;
+    }
+
+    private String[] getFiltersForTable(String table_name) {
+        List<String> all_filters = new ArrayList<>();
+        List<RequestFilter> table_filters = filters.get(table_name);
+
+        if (table_filters == null) {
+            return new String[0];
+        }
+
+        for (RequestFilter filter : table_filters) {
+            String filter_string = "";
+            String filter_type = getColData(filter.col).type;
+
+            if (filter_type.equals("INTEGER") || filter_type.equals("REAL")) {
+                filter_string = DataBaseHelpers.createFilterStatementInteger(
+                    filter.col,
+                    filter.val,
+                    filter.special
+                );
+            } else if (filter_type.equals("DATE")) {
+                filter_string = DataBaseHelpers.createFilterStatementDate(
+                    filter.col,
+                    filter.val,
+                    filter.special
+                );
+            } else if (filter_type.equals("TEXT")) {
+                filter_string = DataBaseHelpers.createFilterStatementWord(
+                    filter.col,
+                    filter.val,
+                    filter.special.equals("Exact")
+                );
+            }
+
+            all_filters.add(filter_string);
+        }
+
+        return all_filters.toArray(new String[0]);
     }
 
     private void showFilterWindow(String table_name) {
@@ -260,10 +329,10 @@ public class ClientApp extends Application {
 
         if (table_filters != null) {
             for (RequestFilter filter : table_filters) {
-                String col_type = columns.get(filter.col);
+                String col_type = getColData(filter.col).type;
 
                 ComboBox<String> cols = new ComboBox<>(
-                    FXCollections.observableArrayList(columns.keySet())
+                    FXCollections.observableArrayList(column_names)
                 );
 
                 cols.setValue(filter.col);
@@ -300,23 +369,23 @@ public class ClientApp extends Application {
 
         add_button.setOnAction(e -> {
             ComboBox<String> cols = new ComboBox<>(
-                FXCollections.observableArrayList(columns.keySet())
+                FXCollections.observableArrayList(column_names)
             );
 
-            cols.setValue(columns.keySet().iterator().next());
+            cols.setValue(column_names[0]);
 
             TextField val = new TextField();
 
             ComboBox<String> spec = new ComboBox<>(
                 FXCollections.observableArrayList(
-                    getSpecialOptions(columns.get(cols.getValue()))
+                    getSpecialOptions(getColData(cols.getValue()).type)
                 )
             );
 
             spec.setValue(spec.getItems().get(0));
 
             cols.valueProperty().addListener((obs, old, newCol) -> {
-                String type = columns.get(newCol);
+                String type = getColData(newCol).type;
 
                 spec.getItems().setAll(getSpecialOptions(type));
                 spec.setValue(spec.getItems().get(0));
@@ -358,7 +427,7 @@ public class ClientApp extends Application {
                     if (
                         !verifyAgainstTypeLoose(
                             filter.val,
-                            columns.get(filter.col)
+                            getColData(filter.col)
                         )
                     ) {
                         add_to_list = false;
@@ -408,4 +477,16 @@ public class ClientApp extends Application {
 
         return null;
     }
+
+    private ColumnData getColData(String column_name) {
+        for (ColumnData column_data : columns) {
+            if (column_data.name.equals(column_name)) {
+                return column_data;
+            }
+        }
+
+        return null;
+    }
 }
+
+// NULL is null I reserve that word

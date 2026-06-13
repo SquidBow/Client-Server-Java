@@ -46,10 +46,14 @@ public class DataBaseHelpers {
     ) {
         String sql = " and " + column;
 
+        if (word.equals("NULL")) {
+            return sql + " is null&&&";
+        }
+
         if (exact) {
             sql += " = ?";
 
-            return sql + "&&&" + word + "";
+            return sql + "&&&" + word;
         } else {
             sql += " like ?";
 

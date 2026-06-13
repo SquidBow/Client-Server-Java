@@ -69,8 +69,12 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
             ) {
                 int i = 1;
 
-                for (String filter : db_context.filters)
-                    ps.setObject(i++, filter.split("&&&")[1]);
+                for (String filter : db_context.filters) {
+                    String[] parts = filter.split("&&&");
+                    if (!parts[0].endsWith("is null")) {
+                        ps.setObject(i++, parts[1]);
+                    }
+                }
 
                 ps.setObject(i++, db_context.limit);
                 ps.setObject(i++, db_context.offset);
@@ -89,7 +93,13 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
 
                     if (col > 1) responce.message += (":::");
                     responce.message +=
-                        col_name + "&&&" + meta_data.getColumnTypeName(col);
+                        col_name +
+                        "&&&" +
+                        meta_data.getColumnTypeName(col) +
+                        "&&&" +
+                        (meta_data.isNullable(col) == 1
+                            ? "nullable"
+                            : "notnull");
                 }
 
                 while (rs.next()) {
@@ -100,7 +110,7 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
 
                         Object val = rs.getObject(col);
                         responce.message +=
-                            val == null ? "null" : val.toString();
+                            val == null ? "NULL" : val.toString();
                     }
                 }
             } catch (SQLException e) {
@@ -189,7 +199,11 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                 int i = 0;
 
                 for (Object val : object_context.object.getMap().values()) {
-                    ps.setObject(++i, val);
+                    if (val.toString().equals("NULL")) {
+                        ps.setNull(++i, Types.NULL);
+                    } else {
+                        ps.setObject(++i, val);
+                    }
                 }
 
                 int rows = ps.executeUpdate();

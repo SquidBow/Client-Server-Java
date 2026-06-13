@@ -7,6 +7,7 @@ import javafx.scene.layout.HBox;
 
 public class Conversions {
 
+    @SuppressWarnings("unchecked")
     public static RequestFilter nodeToFilter(Node node) {
         HBox row = (HBox) node;
 
@@ -27,10 +28,19 @@ public class Conversions {
         );
     }
 
-    public static boolean verifyAgainstTypeLoose(String value, String type) {
+    public static boolean verifyAgainstTypeLoose(
+        String value,
+        ColumnData data
+    ) {
+        if (value.equals("NULL") && data.nullable) return true;
+
+        if (data.type.equals("TEXT")) {
+            return true;
+        }
+
         if (value.isBlank()) return false;
 
-        if (type.equals("INTEGER") || type.equals("REAL")) {
+        if (data.type.equals("INTEGER") || data.type.equals("REAL")) {
             if (
                 value.length() == 1 && !Character.isDigit(value.charAt(0))
             ) return false;
@@ -52,7 +62,7 @@ public class Conversions {
             }
 
             return true;
-        } else if (type.equals("DATE")) {
+        } else if (data.type.equals("DATE")) {
             java.time.format.DateTimeFormatter formatter =
                 java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
@@ -62,8 +72,6 @@ public class Conversions {
             } catch (java.time.format.DateTimeParseException e) {
                 return false;
             }
-        } else if (type.equals("TEXT")) {
-            return true;
         }
 
         return false;
