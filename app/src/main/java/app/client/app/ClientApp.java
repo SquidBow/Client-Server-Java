@@ -1,7 +1,5 @@
 package app.client.app;
 
-import static app.client.helpers.Conversions.*;
-
 import app.client.helpers.ClientInfo;
 import app.client.helpers.ColumnData;
 import app.client.helpers.DataBaseHelpers;
@@ -24,40 +22,21 @@ import javafx.stage.Stage;
 public class ClientApp extends Application {
 
     final int PORT = 8080;
-    // static final String[] TABLES = {
-    //     "Category",
-    //     "Check",
-    //     "Customer_Card",
-    //     "Employee",
-    //     "Product",
-    //     "Sale",
-    //     "Store_Product",
-    // };
 
-    private static final Map<String, String> TABLES = Map.of(
-        "Category",
-        "category_number",
+    private static final Map<String, String> TABLES = new LinkedHashMap<>();
 
-        "Check",
-        "check_number",
-
-        "Customer_Card",
-        "card_number",
-
-        "Employee",
-        "id_employee",
-
-        "Product",
-        "id_product",
-
-        "Sale",
-        "UPC",
-
-        "Store_Product",
-        "UPC"
-    );
+    static {
+        TABLES.put("Category", "category_number");
+        TABLES.put("Check", "check_number");
+        TABLES.put("Customer_Card", "card_number");
+        TABLES.put("Employee", "id_employee");
+        TABLES.put("Product", "id_product");
+        TABLES.put("Sale", "UPC");
+        TABLES.put("Store_Product", "UPC");
+    }
 
     private String first_table = "Employee";
+
     private static ClientInfo client_info;
     private List<ColumnData> columns = new ArrayList<>();
     private String[] column_names = new String[0];
@@ -112,13 +91,18 @@ public class ClientApp extends Application {
             first_table.equals("Check") ||
             first_table.equals("Customer_Card")
         ) {
-            // Button insert_button = new Button("Insert a new row");
+            Button insert_button = new Button("Insert a new row");
+
+            insert_button.setOnAction(e -> {
+                showInsertWindow(table_selector.getValue());
+            });
 
             top_bar = new HBox(
                 10,
                 new Label("Table:"),
                 table_selector,
-                filter_button
+                filter_button,
+                insert_button
             );
         } else {
             top_bar = new HBox(
@@ -169,6 +153,10 @@ public class ClientApp extends Application {
                     )
                     .message;
 
+                System.out.println(
+                    "Got responce on 1: " + responce_body + "\n"
+                );
+
                 if (responce_body == null) return;
 
                 //First split by ;;;
@@ -186,7 +174,7 @@ public class ClientApp extends Application {
 
                 //Start from 1 cause [0] is the name of cols
                 for (int i = 1; i < data.length; i++) {
-                    String[] cells = data[i].split(":::");
+                    String[] cells = data[i].split(":::", -1);
 
                     rows.add(FXCollections.observableArrayList(cells));
                 }
@@ -208,6 +196,8 @@ public class ClientApp extends Application {
     }
 
     private String[] parseColumns(String str) {
+        columns.clear();
+
         String[] data = str.split(":::");
         String[] col_names = new String[data.length];
 
@@ -283,6 +273,89 @@ public class ClientApp extends Application {
         return col_names_row;
     }
 
+    private void showInsertWindow(String table_name) {
+        Stage root = new Stage();
+        VBox view = new VBox(10);
+
+        for (String col_name : column_names) {
+            ColumnData col_data = getColData(col_name);
+
+            TextField value_field = new TextField();
+
+            if (col_data.type.equals("INTEGER")) {
+                value_field.setPromptText("Enter an integer value");
+            } else if (col_data.type.equals("REAL")) {
+                value_field.setPromptText("Enter a decimal value");
+            } else if (col_data.type.equals("TEXT")) {
+                value_field.setPromptText("Enter text");
+            } else if (col_data.type.equals("DATE")) {
+                value_field.setPromptText("Enter a date");
+            }
+
+            view.getChildren().add(
+                new HBox(10, new Label(col_name + ":"), value_field)
+            );
+        }
+
+        Button apply_button = new Button("Apply the changes");
+
+        apply_button.setOnAction(e -> {
+            List<String> col_values = new ArrayList<>();
+            boolean send_request = true;
+
+            for (int i = 0; i < column_names.length; i++) {
+                HBox column = (HBox) view.getChildren().get(i);
+
+                TextField col_value = (TextField) column.getChildren().get(1);
+
+                if (
+                    !verifyAgainstType(
+                        col_value.getText(),
+                        getColData(column_names[i]),
+                        true
+                    )
+                ) {
+                    send_request = false;
+
+                    col_value.setStyle(
+                        "-fx-border-color: red; -fx-border-width: 1.5px;"
+                    );
+                } else {
+                    col_value.setStyle("");
+                }
+
+                col_values.add(col_value.getText());
+            }
+
+            if (send_request) {
+                String message = DataBaseHelpers.encodeDBObjectContext(
+                    table_name,
+                    TABLES.get(table_name),
+                    column_names,
+                    col_values.toArray(new String[0])
+                );
+                try {
+                    Message responce = actual_client.sendRequest(
+                        new Message(3, client_info.id, message)
+                    );
+
+                    System.out.println("Responce: " + responce.message);
+                    System.out.println("User role is: " + client_info.role);
+
+                    loadTable(table_name);
+                    root.close();
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            }
+        });
+
+        view.getChildren().add(apply_button);
+
+        root.setScene(new Scene(view, 400, 300));
+        root.show();
+    }
+
     private String[] getFiltersForTable(String table_name) {
         List<String> all_filters = new ArrayList<>();
         List<RequestFilter> table_filters = filters.get(table_name);
@@ -293,21 +366,23 @@ public class ClientApp extends Application {
 
         for (RequestFilter filter : table_filters) {
             String filter_string = "";
-            String filter_type = getColData(filter.col).type;
+            ColumnData col_data = getColData(filter.col);
 
-            if (filter_type.equals("INTEGER") || filter_type.equals("REAL")) {
+            if (
+                col_data.type.equals("INTEGER") || col_data.type.equals("REAL")
+            ) {
                 filter_string = DataBaseHelpers.createFilterStatementInteger(
                     filter.col,
                     filter.val,
                     filter.special
                 );
-            } else if (filter_type.equals("DATE")) {
+            } else if (col_data.type.equals("DATE")) {
                 filter_string = DataBaseHelpers.createFilterStatementDate(
                     filter.col,
                     filter.val,
                     filter.special
                 );
-            } else if (filter_type.equals("TEXT")) {
+            } else if (col_data.type.equals("TEXT")) {
                 filter_string = DataBaseHelpers.createFilterStatementWord(
                     filter.col,
                     filter.val,
@@ -329,8 +404,6 @@ public class ClientApp extends Application {
 
         if (table_filters != null) {
             for (RequestFilter filter : table_filters) {
-                String col_type = getColData(filter.col).type;
-
                 ComboBox<String> cols = new ComboBox<>(
                     FXCollections.observableArrayList(column_names)
                 );
@@ -341,7 +414,7 @@ public class ClientApp extends Application {
 
                 ComboBox<String> filter_special = new ComboBox<>(
                     FXCollections.observableArrayList(
-                        getSpecialOptions(col_type)
+                        getSpecialOptions(getColData(filter.col).type)
                     )
                 );
 
@@ -385,9 +458,10 @@ public class ClientApp extends Application {
             spec.setValue(spec.getItems().get(0));
 
             cols.valueProperty().addListener((obs, old, newCol) -> {
-                String type = getColData(newCol).type;
+                spec.getItems().setAll(
+                    getSpecialOptions(getColData(newCol).type)
+                );
 
-                spec.getItems().setAll(getSpecialOptions(type));
                 spec.setValue(spec.getItems().get(0));
             });
 
@@ -425,9 +499,10 @@ public class ClientApp extends Application {
                         .get(1);
 
                     if (
-                        !verifyAgainstTypeLoose(
+                        !verifyAgainstType(
                             filter.val,
-                            getColData(filter.col)
+                            getColData(filter.col),
+                            false
                         )
                     ) {
                         add_to_list = false;
@@ -443,9 +518,13 @@ public class ClientApp extends Application {
                 }
             }
 
-            if (add_to_list) filters.put(table_name, filter_list);
+            if (add_to_list) {
+                filters.put(table_name, filter_list);
 
-            loadTable(table_name);
+                loadTable(table_name);
+
+                root.close();
+            }
         });
 
         HBox bottom_bar = new HBox(apply_button);
@@ -486,6 +565,87 @@ public class ClientApp extends Application {
         }
 
         return null;
+    }
+
+    private boolean verifyAgainstType(
+        String value,
+        ColumnData column_data,
+        boolean strict
+    ) {
+        String check_val = value.trim();
+
+        if (check_val.equals("NULL") && column_data.nullable) return true;
+
+        if (check_val.isBlank()) return false;
+
+        if (column_data.type.equals("TEXT")) {
+            return true;
+        }
+
+        if (
+            column_data.type.equals("INTEGER") ||
+            column_data.type.equals("REAL")
+        ) {
+            if (
+                check_val.length() == 1 &&
+                !Character.isDigit(check_val.charAt(0))
+            ) return false;
+
+            if (check_val.equals("-.")) return false;
+
+            boolean dot = false;
+            int start = check_val.charAt(0) == '-' ? 1 : 0;
+
+            for (char val : check_val.substring(start).toCharArray()) {
+                if (val == '.') {
+                    if (
+                        column_data.type.equals("INTEGER") && strict
+                    ) return false;
+
+                    if (dot == true) return false;
+                    else dot = true;
+
+                    continue;
+                }
+
+                if (!Character.isDigit(val)) return false;
+            }
+
+            return true;
+        } else if (column_data.type.equals("DATE")) {
+            java.time.format.DateTimeFormatter formatter =
+                java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy");
+
+            try {
+                java.time.LocalDate.parse(check_val, formatter);
+                return true;
+            } catch (java.time.format.DateTimeParseException e) {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    @SuppressWarnings("unchecked")
+    RequestFilter nodeToFilter(Node node) {
+        HBox row = (HBox) node;
+
+        ComboBox<String> column_field = (ComboBox<String>) row
+            .getChildren()
+            .get(0);
+
+        TextField value_field = (TextField) row.getChildren().get(1);
+
+        ComboBox<String> special_filed = (ComboBox<String>) row
+            .getChildren()
+            .get(2);
+
+        return new RequestFilter(
+            column_field.getValue(),
+            value_field.getText(),
+            special_filed.getValue()
+        );
     }
 }
 

@@ -34,8 +34,8 @@ public class StoreServerTCP extends Thread {
                     }
 
                     send.context.socket.getOutputStream().write(send.data);
-                } catch (InterruptedException e) {
-                } catch (IOException e) {
+                } catch (InterruptedException | IOException e) {
+                    e.printStackTrace();
                 }
             }
         }).start();
@@ -58,7 +58,9 @@ public class StoreServerTCP extends Thread {
                     }
                 }).start();
             }
-        } catch (InterruptedException | IOException e) {}
+        } catch (InterruptedException | IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private void execute(Socket socket) throws RuntimeException {
@@ -98,6 +100,8 @@ public class StoreServerTCP extends Thread {
                 );
             }
 
+            String user_role = auth_status.split("%%%")[1];
+
             byte[] buffer = new byte[18];
 
             //Reads and waits for the next message and doesn't close
@@ -115,15 +119,18 @@ public class StoreServerTCP extends Thread {
                 System.arraycopy(smth1, 0, ret, 16, length);
 
                 queue.decrypt_queue.add(
-                    new AppContext<byte[]>(ret, auth_status, context)
+                    new AppContext<byte[]>(ret, user_role, context)
                 );
             }
         } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
             throw new RuntimeException("Can't read from client", e);
         } finally {
             try {
                 socket.close();
-            } catch (IOException e) {}
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 

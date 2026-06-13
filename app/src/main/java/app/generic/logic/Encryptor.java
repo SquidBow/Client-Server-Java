@@ -32,6 +32,7 @@ public class Encryptor implements IEncryptor, Runnable {
                 );
             }
         } catch (InterruptedException e) {
+            e.printStackTrace();
             Thread.currentThread().interrupt();
         }
     }
@@ -79,6 +80,7 @@ public class Encryptor implements IEncryptor, Runnable {
 
             return cipher.doFinal(entry_message.getBytes());
         } catch (Exception e) {
+            e.printStackTrace();
             throw new RuntimeException();
         }
     }

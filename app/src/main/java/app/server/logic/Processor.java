@@ -88,7 +88,6 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
 
                 for (int col = 1; col <= column_count; col++) {
                     String col_name = meta_data.getColumnName(col);
-
                     if (col_name.equals("password")) continue;
 
                     if (col > 1) responce.message += (":::");
@@ -106,6 +105,9 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                     responce.message += ";;;";
 
                     for (int col = 1; col <= column_count; col++) {
+                        String col_name = meta_data.getColumnName(col);
+                        if (col_name.equals("password")) continue;
+
                         if (col > 1) responce.message += ":::";
 
                         Object val = rs.getObject(col);
@@ -306,7 +308,8 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         for (String pair : s.split(":::")) {
             if (pair.isBlank()) continue;
 
-            String[] kv = pair.split("&&&");
+            //TODO: Remove limits for bad pair error if no fix
+            String[] kv = pair.split("&&&", 2);
 
             if (kv.length != 2) throw new IllegalArgumentException(
                 "Bad map pair: " + pair
