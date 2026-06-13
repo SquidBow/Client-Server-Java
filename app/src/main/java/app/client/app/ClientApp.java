@@ -23,16 +23,16 @@ public class ClientApp extends Application {
 
     final int PORT = 8080;
 
-    private static final Map<String, String> TABLES = new LinkedHashMap<>();
+    private static final Map<String, String[]> TABLES = new LinkedHashMap<>();
 
     static {
-        TABLES.put("Category", "category_number");
-        TABLES.put("Check", "check_number");
-        TABLES.put("Customer_Card", "card_number");
-        TABLES.put("Employee", "id_employee");
-        TABLES.put("Product", "id_product");
-        TABLES.put("Sale", "UPC");
-        TABLES.put("Store_Product", "UPC");
+        TABLES.put("Category", new String[] { "category_number" });
+        TABLES.put("Check", new String[] { "check_number" });
+        TABLES.put("Customer_Card", new String[] { "card_number" });
+        TABLES.put("Employee", new String[] { "id_employee" });
+        TABLES.put("Product", new String[] { "id_product" });
+        TABLES.put("Sale", new String[] { "UPC", "check_number" });
+        TABLES.put("Store_Product", new String[] { "UPC" });
     }
 
     private String first_table = "Employee";
@@ -84,7 +84,6 @@ public class ClientApp extends Application {
 
         HBox top_bar;
 
-        //TODO INSERT BUTTON
         if (
             client_info.role.equals("Manager") ||
             first_table.equals("Sale") ||
@@ -97,12 +96,45 @@ public class ClientApp extends Application {
                 showInsertWindow(table_selector.getValue());
             });
 
+            Button delete_button = new Button("Delete entry");
+
+            delete_button.setOnAction(e -> {
+                ObservableList<String> row = table_view
+                    .getSelectionModel()
+                    .getSelectedItem();
+
+                if (row == null) return;
+
+                String[] values = new String[column_names.length];
+                for (int i = 0; i < column_names.length; i++) {
+                    values[i] = row.get(i);
+                }
+
+                String message = DataBaseHelpers.encodeDBObjectContext(
+                    table_selector.getValue(),
+                    TABLES.get(table_selector.getValue()),
+                    column_names,
+                    values
+                );
+
+                try {
+                    actual_client.sendRequest(
+                        new Message(4, client_info.id, message)
+                    );
+
+                    loadTable(table_selector.getValue());
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            });
+
             top_bar = new HBox(
                 10,
                 new Label("Table:"),
                 table_selector,
                 filter_button,
-                insert_button
+                insert_button,
+                delete_button
             );
         } else {
             top_bar = new HBox(
@@ -238,31 +270,6 @@ public class ClientApp extends Application {
             tc.setCellValueFactory(f ->
                 new SimpleStringProperty(f.getValue().get(final_i))
             );
-
-            // tc.setCellFactory(f -> {
-            //     TableCell<ObservableList<String>, String> cell =
-            //         new TableCell<>() {
-            //             @Override
-            //             protected void updateItem(
-            //                 String item,
-            //                 boolean empty
-            //             ) {
-            //                 super.updateItem(item, empty);
-            //                 setText(empty ? null : item);
-            //             }
-            //         };
-
-            //     // cell.setOnContextMenuRequested(e -> {
-            //         //TODO add filters stuff
-
-            //         // ContextMenu menu = new ContextMenu();
-            //         // menu.getItems().add(e)
-
-            //         // menu.show(cell, e.getScreenX(), e.getScreenY());
-            //     // });
-
-            //     return cell;
-            // });
 
             //Flags
             tc.setStyle("-fx-alignment: CENTER;");

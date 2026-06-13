@@ -6,21 +6,32 @@ import java.util.Map;
 public class GenericObject implements IDBObject {
 
     public Map<String, Object> object_map;
-    public String primary_key;
+    public String[] primary_keys;
 
-    public GenericObject(String primary_key, Map<String, Object> object_map) {
-        this.primary_key = primary_key;
+    public GenericObject(
+        String[] primary_keys,
+        Map<String, Object> object_map
+    ) {
+        this.primary_keys = primary_keys;
         this.object_map = object_map;
     }
 
     @Override
-    public String getPrimaryKey() {
-        return primary_key;
+    public String[] getPrimaryKeys() {
+        return primary_keys;
     }
 
     @Override
-    public Object getPrimaryValue() {
-        return object_map.get(getPrimaryKey());
+    public Object[] getPrimaryValues() {
+        String[] keys = getPrimaryKeys();
+        Object[] vals = new Object[keys.length];
+
+        int i = 0;
+        for (String key : keys) {
+            vals[i++] = object_map.get(key);
+        }
+
+        return vals;
     }
 
     @Override

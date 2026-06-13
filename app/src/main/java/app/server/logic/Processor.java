@@ -157,15 +157,18 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                     .getMap()
                     .entrySet()) {
                     if (
-                        !entry
-                            .getKey()
-                            .equals(object_context.object.getPrimaryKey())
+                        !contains(
+                            entry.getKey(),
+                            object_context.object.getPrimaryKeys()
+                        )
                     ) {
                         ps.setObject(++i, entry.getValue());
                     }
                 }
 
-                ps.setObject(++i, object_context.object.getPrimaryValue());
+                for (Object val : object_context.object.getPrimaryValues()) {
+                    ps.setObject(++i, val);
+                }
 
                 int rows = ps.executeUpdate();
 
@@ -236,11 +239,15 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                 PreparedStatement ps = connection.prepareStatement(
                     createDeleteStatement(
                         object_context.table,
-                        object_context.object
+                        object_context.object.getPrimaryKeys()
                     )
                 )
             ) {
-                ps.setObject(1, object_context.object.getPrimaryValue());
+                int i = 0;
+
+                for (String key : object_context.object.getPrimaryKeys()) {
+                    ps.setObject(++i, object_context.object.getMap().get(key));
+                }
 
                 int rows = ps.executeUpdate();
 
@@ -298,7 +305,7 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
 
         return new DBObjectContext(
             fields[0],
-            new GenericObject(fields[1], parseMap(fields[2]))
+            new GenericObject(fields[1].split(":::"), parseMap(fields[2]))
         );
     }
 
@@ -308,7 +315,6 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         for (String pair : s.split(":::")) {
             if (pair.isBlank()) continue;
 
-            //TODO: Remove limits for bad pair error if no fix
             String[] kv = pair.split("&&&", 2);
 
             if (kv.length != 2) throw new IllegalArgumentException(
@@ -367,5 +373,13 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         } catch (SQLException e) {
             throw new RuntimeException("Failed Auth: " + e.getMessage());
         }
+    }
+
+    private boolean contains(Object val, Object[] list) {
+        for (Object object : list) {
+            if (val.equals(object)) return true;
+        }
+
+        return false;
     }
 }

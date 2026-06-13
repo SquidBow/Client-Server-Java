@@ -201,27 +201,28 @@ public class DataBaseManager {
         String sql = "update \"" + table + "\" set ";
 
         for (Map.Entry<String, Object> entry : object.getMap().entrySet()) {
-            if (!entry.getKey().equals(object.primary_key)) {
+            if (!contains(entry.getKey(), object.getPrimaryKeys())) {
                 sql += entry.getKey() + " = ?, ";
             }
         }
 
-        sql =
-            sql.substring(0, sql.length() - 2) +
-            " where " +
-            object.primary_key +
-            " = ?";
+        sql = sql.substring(0, sql.length() - 2) + " where";
+
+        for (Object key : object.getPrimaryKeys()) {
+            sql += " " + key + "=?";
+        }
 
         return sql;
     }
 
-    public static String createDeleteStatement(
-        String table,
-        GenericObject object
-    ) {
-        return (
-            "delete from \"" + table + "\" where " + object.primary_key + " = ?"
-        );
+    public static String createDeleteStatement(String table, String[] keys) {
+        String sql = "delete from \"" + table + "\" where 1=1"; // + object.primary_key + " = ?"
+
+        for (String key : keys) {
+            sql += " and " + key + "=?";
+        }
+
+        return sql;
     }
 
     public static String writeYourOwnSQL(String sql) {
@@ -230,5 +231,13 @@ public class DataBaseManager {
 
     public static String writeMyOwnSQL(String sql) {
         return sql;
+    }
+
+    private static boolean contains(Object val, Object[] list) {
+        for (Object object : list) {
+            if (val.equals(object)) return true;
+        }
+
+        return false;
     }
 }

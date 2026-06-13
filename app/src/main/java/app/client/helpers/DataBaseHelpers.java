@@ -23,10 +23,12 @@ public class DataBaseHelpers {
 
     public static String encodeDBObjectContext(
         String table,
-        String primary_key,
+        String[] primary_keys,
         String[] col_names,
         String[] values
     ) {
+        String pk_string = String.join(":::", primary_keys);
+
         String map = "";
 
         for (int i = 0; i < col_names.length; i++) {
@@ -34,7 +36,7 @@ public class DataBaseHelpers {
             map += col_names[i] + "&&&" + values[i];
         }
 
-        return String.join(";;;", table, primary_key, map);
+        return String.join(";;;", table, pk_string, map);
     }
 
     // Since filters are gona be created on the client need to pass in the value to
