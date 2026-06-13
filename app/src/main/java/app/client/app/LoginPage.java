@@ -1,10 +1,10 @@
 package app.client.app;
 
+import static app.client.helpers.Functions.*;
+
 import app.client.helpers.ClientInfo;
 import app.client.network.tcp.ActualClient;
 import app.generic.helpers.Message;
-import java.security.MessageDigest;
-import java.util.HexFormat;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.PasswordField;
@@ -71,19 +71,8 @@ public class LoginPage {
         if (responce.message.equals("Failed auth")) return null;
 
         return new ClientInfo(
-            Integer.valueOf(responce.message.split("%%%")[0]),
+            Integer.parseInt(responce.message.split("%%%")[0]),
             responce.message.split("%%%")[1]
         );
-    }
-
-    public static String hashPassword(String password) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(password.getBytes("UTF-8"));
-
-            return HexFormat.of().formatHex(hash);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 }

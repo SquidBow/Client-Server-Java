@@ -52,6 +52,15 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         responce.user_id = message.user_id;
         responce.message = "OK";
 
+        System.out.println(
+            "Processing message:\nCommand_id: " +
+                message.command_id +
+                "\nUser_id: " +
+                message.user_id +
+                "\nMessage: " +
+                message.message
+        );
+
         //TODO: ALL THAT NEEDS TO BE REFACTORED INTO DIFFERENT FUNCTIONS
 
         // Maybe add auth to this when we execute command check for the right
@@ -260,15 +269,6 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                 );
             }
         }
-
-        System.out.println(
-            "Processed message:\nCommand_id: " +
-                message.command_id +
-                "\nUser_id: " +
-                message.user_id +
-                "\nMessage: " +
-                message.message
-        );
 
         sendMessage(responce);
     }

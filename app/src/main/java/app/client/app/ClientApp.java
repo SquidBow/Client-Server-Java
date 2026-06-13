@@ -1,5 +1,7 @@
 package app.client.app;
 
+import static app.client.helpers.Functions.*;
+
 import app.client.helpers.ClientInfo;
 import app.client.helpers.ColumnData;
 import app.client.helpers.DataBaseHelpers;
@@ -45,7 +47,7 @@ public class ClientApp extends Application {
 
     ActualClient actual_client;
 
-    private boolean DEBUG = true;
+    private boolean DEBUG = false;
 
     @Override
     public void start(Stage primary_stage) {
@@ -90,7 +92,7 @@ public class ClientApp extends Application {
             first_table.equals("Check") ||
             first_table.equals("Customer_Card")
         ) {
-            Button insert_button = new Button("Insert a new row");
+            Button insert_button = new Button("Insert entry");
 
             insert_button.setOnAction(e -> {
                 showInsertWindow(table_selector.getValue());
@@ -128,12 +130,26 @@ public class ClientApp extends Application {
                 }
             });
 
+            //Update button
+            Button update_button = new Button("Update entry");
+
+            update_button.setOnAction(e -> {
+                ObservableList<String> selected = table_view
+                    .getSelectionModel()
+                    .getSelectedItem();
+
+                if (selected != null) {
+                    showUpdateWindow(table_selector.getValue(), selected);
+                }
+            });
+
             top_bar = new HBox(
                 10,
                 new Label("Table:"),
                 table_selector,
                 filter_button,
                 insert_button,
+                update_button,
                 delete_button
             );
         } else {
@@ -284,10 +300,137 @@ public class ClientApp extends Application {
         Stage root = new Stage();
         VBox view = new VBox(10);
 
+        boolean is_employee_table = table_name.equals("Employee");
+
         for (String col_name : column_names) {
             ColumnData col_data = getColData(col_name);
 
             TextField value_field = new TextField();
+
+            if (col_data.type.equals("INTEGER")) {
+                value_field.setPromptText("Enter an integer value");
+            } else if (col_data.type.equals("REAL")) {
+                value_field.setPromptText("Enter a decimal value");
+            } else if (col_data.type.equals("TEXT")) {
+                value_field.setPromptText("Enter text");
+            } else if (col_data.type.equals("DATE")) {
+                value_field.setPromptText("Enter a date");
+            }
+
+            view.getChildren().add(
+                new HBox(10, new Label(col_name + ":"), value_field)
+            );
+        }
+
+        if (is_employee_table) {
+            view.getChildren().add(
+                new HBox(10, new Label("Password :"), new TextField())
+            );
+        }
+
+        Button apply_button = new Button("Apply the changes");
+
+        apply_button.setOnAction(e -> {
+            List<String> col_values = new ArrayList<>();
+            boolean send_request = true;
+
+            for (
+                int i = 0;
+                i < column_names.length + (is_employee_table ? 1 : 0);
+                i++
+            ) {
+                HBox column = (HBox) view.getChildren().get(i);
+
+                TextField col_value = (TextField) column.getChildren().get(1);
+
+                ColumnData col_data;
+
+                if (i == column_names.length) {
+                    col_data = new ColumnData("password", "TEXT", false);
+                } else {
+                    col_data = getColData(column_names[i]);
+
+                    if (
+                        is_employee_table && col_data.name.equals("id_employee")
+                    ) col_data.type = "INTEGER";
+                }
+
+                if (!verifyAgainstType(col_value.getText(), col_data, true)) {
+                    send_request = false;
+
+                    col_value.setStyle(
+                        "-fx-border-color: red; -fx-border-width: 1.5px;"
+                    );
+                } else {
+                    col_value.setStyle("");
+                }
+
+                col_values.add(col_value.getText());
+            }
+
+            String[] all_col_names;
+
+            if (is_employee_table) {
+                all_col_names = Arrays.copyOf(
+                    column_names,
+                    column_names.length + 1
+                );
+                all_col_names[all_col_names.length - 1] = "password";
+
+                col_values.set(
+                    col_values.size() - 1,
+                    hashPassword(col_values.getLast())
+                );
+            } else {
+                all_col_names = column_names;
+            }
+
+            if (send_request) {
+                String message = DataBaseHelpers.encodeDBObjectContext(
+                    table_name,
+                    TABLES.get(table_name),
+                    all_col_names,
+                    col_values.toArray(new String[0])
+                );
+                try {
+                    Message responce = actual_client.sendRequest(
+                        new Message(3, client_info.id, message)
+                    );
+
+                    System.out.println("Responce: " + responce.message);
+                    System.out.println("User role is: " + client_info.role);
+
+                    loadTable(table_name);
+                    root.close();
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            }
+        });
+
+        view.getChildren().add(apply_button);
+
+        root.setScene(new Scene(view, 400, 300));
+        root.show();
+    }
+
+    private void showUpdateWindow(
+        String table_name,
+        ObservableList<String> selected
+    ) {
+        Stage root = new Stage();
+        VBox view = new VBox(10);
+
+        int index = 0;
+
+        for (String col_name : column_names) {
+            ColumnData col_data = getColData(col_name);
+
+            TextField value_field = new TextField(selected.get(index++));
+
+            if (Arrays.asList(TABLES.get(table_name)).contains(col_name)) {
+                value_field.setEditable(false);
+            }
 
             if (col_data.type.equals("INTEGER")) {
                 value_field.setPromptText("Enter an integer value");
@@ -343,7 +486,7 @@ public class ClientApp extends Application {
                 );
                 try {
                     Message responce = actual_client.sendRequest(
-                        new Message(3, client_info.id, message)
+                        new Message(2, client_info.id, message)
                     );
 
                     System.out.println("Responce: " + responce.message);
@@ -586,6 +729,7 @@ public class ClientApp extends Application {
         if (check_val.isBlank()) return false;
 
         if (column_data.type.equals("TEXT")) {
+            // System.out.println("\n\n\n\nHERE\n\n\n\n");
             return true;
         }
 
@@ -597,6 +741,8 @@ public class ClientApp extends Application {
                 check_val.length() == 1 &&
                 !Character.isDigit(check_val.charAt(0))
             ) return false;
+
+            // System.out.println("\n\n\nERHEKJHKAJDH 2\n\n\n");
 
             if (check_val.equals("-.")) return false;
 
@@ -621,7 +767,7 @@ public class ClientApp extends Application {
             return true;
         } else if (column_data.type.equals("DATE")) {
             java.time.format.DateTimeFormatter formatter =
-                java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy");
+                java.time.format.DateTimeFormatter.ofPattern("d.M.yyyy");
 
             try {
                 java.time.LocalDate.parse(check_val, formatter);

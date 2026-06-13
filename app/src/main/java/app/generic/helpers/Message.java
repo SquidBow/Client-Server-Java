@@ -6,8 +6,7 @@ public class Message {
     public int user_id;
     public String message;
 
-    public Message() {
-    }
+    public Message() {}
 
     public Message(int command_id, int user_id, String message) {
         this.command_id = command_id;

@@ -89,16 +89,6 @@ public class DataBaseHelpers {
             sql += " <= ?";
         }
 
-        java.time.format.DateTimeFormatter inputFormat =
-            java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy");
-
-        java.time.format.DateTimeFormatter dbFormat =
-            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd");
-
-        String dbDate = java.time.LocalDate.parse(val, inputFormat).format(
-            dbFormat
-        );
-
-        return sql + "&&&" + dbDate;
+        return sql + "&&&" + val;
     }
 }
