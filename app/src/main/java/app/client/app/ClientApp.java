@@ -45,9 +45,16 @@ public class ClientApp extends Application {
     private Map<String, List<RequestFilter>> filters = new HashMap<>();
     private TableView<ObservableList<String>> table_view = new TableView<>();
 
+    // Map<table, Map<col, values>> <- NOT THIS
+    // We already know the table cause it is for this table
+    // So Map<col, values> <- NOT THIS
+    // Cause I need to save the real id and display to replace when updating/inserting/deleting
+    // So Map<col, Map<real, display>>
+    private Map<String, Map<String, String>> forein_keys = new HashMap<>();
+
     ActualClient actual_client;
 
-    private boolean DEBUG = false;
+    private boolean DEBUG = true;
 
     @Override
     public void start(Stage primary_stage) {
@@ -208,7 +215,7 @@ public class ClientApp extends Application {
                 if (responce_body == null) return;
 
                 //First split by ;;;
-                String[] data = responce_body.split(";;;");
+                String[] data = responce_body.split(";;;", -1);
                 if (data.length == 0) return;
 
                 column_names = parseColumns(data[0]);
@@ -217,11 +224,14 @@ public class ClientApp extends Application {
                     TableColumn<ObservableList<String>, String>
                 > col_names_row = getColumnNamesRow(column_names);
 
+                parseFKeys(data[1]);
+
                 //Get all rows
                 List<ObservableList<String>> rows = new ArrayList<>();
 
                 //Start from 1 cause [0] is the name of cols
-                for (int i = 1; i < data.length; i++) {
+                //Start from 2 cause forein_keys are at [1]
+                for (int i = 2; i < data.length; i++) {
                     String[] cells = data[i].split(":::", -1);
 
                     rows.add(FXCollections.observableArrayList(cells));
@@ -297,29 +307,40 @@ public class ClientApp extends Application {
     }
 
     private void showInsertWindow(String table_name) {
+        System.out.println("FK map: " + forein_keys);
+
         Stage root = new Stage();
         VBox view = new VBox(10);
 
         boolean is_employee_table = table_name.equals("Employee");
 
         for (String col_name : column_names) {
-            ColumnData col_data = getColData(col_name);
+            if (forein_keys.containsKey(col_name)) {
+                ComboBox<String> combo = new ComboBox<>();
+                combo.getItems().addAll(forein_keys.get(col_name).values());
 
-            TextField value_field = new TextField();
+                view.getChildren().add(
+                    new HBox(10, new Label(col_name + ":"), combo)
+                );
+            } else {
+                ColumnData col_data = getColData(col_name);
 
-            if (col_data.type.equals("INTEGER")) {
-                value_field.setPromptText("Enter an integer value");
-            } else if (col_data.type.equals("REAL")) {
-                value_field.setPromptText("Enter a decimal value");
-            } else if (col_data.type.equals("TEXT")) {
-                value_field.setPromptText("Enter text");
-            } else if (col_data.type.equals("DATE")) {
-                value_field.setPromptText("Enter a date");
+                TextField value_field = new TextField();
+
+                if (col_data.type.equals("INTEGER")) {
+                    value_field.setPromptText("Enter an integer value");
+                } else if (col_data.type.equals("REAL")) {
+                    value_field.setPromptText("Enter a decimal value");
+                } else if (col_data.type.equals("TEXT")) {
+                    value_field.setPromptText("Enter text");
+                } else if (col_data.type.equals("DATE")) {
+                    value_field.setPromptText("Enter a date");
+                }
+
+                view.getChildren().add(
+                    new HBox(10, new Label(col_name + ":"), value_field)
+                );
             }
-
-            view.getChildren().add(
-                new HBox(10, new Label(col_name + ":"), value_field)
-            );
         }
 
         if (is_employee_table) {
@@ -340,6 +361,24 @@ public class ClientApp extends Application {
                 i++
             ) {
                 HBox column = (HBox) view.getChildren().get(i);
+                Node input = column.getChildren().get(1);
+
+                if (input instanceof ComboBox) {
+                    ComboBox<?> combo = (ComboBox<?>) input;
+                    String col_value = (String) combo.getValue();
+
+                    col_values.add(
+                        getKeyFromReplacement(column_names[i], col_value)
+                    );
+
+                    // System.out.println(
+                    //     "\n\nSEND: " +
+                    //         col_value +
+                    //         " got: " +
+                    //         getKeyFromReplacement(column_names[i], col_value)
+                    // );
+                    continue;
+                }
 
                 TextField col_value = (TextField) column.getChildren().get(1);
 
@@ -426,25 +465,42 @@ public class ClientApp extends Application {
         for (String col_name : column_names) {
             ColumnData col_data = getColData(col_name);
 
-            TextField value_field = new TextField(selected.get(index++));
+            if (forein_keys.containsKey(col_name)) {
+                Label fk_label = new Label(
+                    forein_keys.get(col_name).get(selected.get(index++))
+                );
 
-            if (Arrays.asList(TABLES.get(table_name)).contains(col_name)) {
-                value_field.setEditable(false);
+                fk_label.setUserData("fk");
+
+                view.getChildren().add(
+                    new HBox(10, new Label(col_name + ":"), fk_label)
+                );
+            } else if (
+                Arrays.asList(TABLES.get(table_name)).contains(col_name)
+            ) {
+                Label pk_label = new Label(selected.get(index++));
+                pk_label.setUserData("pk");
+
+                view.getChildren().add(
+                    new HBox(10, new Label(col_name + ":"), pk_label)
+                );
+            } else {
+                TextField value_field = new TextField(selected.get(index++));
+
+                if (col_data.type.equals("INTEGER")) {
+                    value_field.setPromptText("Enter an integer value");
+                } else if (col_data.type.equals("REAL")) {
+                    value_field.setPromptText("Enter a decimal value");
+                } else if (col_data.type.equals("TEXT")) {
+                    value_field.setPromptText("Enter text");
+                } else if (col_data.type.equals("DATE")) {
+                    value_field.setPromptText("Enter a date");
+                }
+
+                view.getChildren().add(
+                    new HBox(10, new Label(col_name + ":"), value_field)
+                );
             }
-
-            if (col_data.type.equals("INTEGER")) {
-                value_field.setPromptText("Enter an integer value");
-            } else if (col_data.type.equals("REAL")) {
-                value_field.setPromptText("Enter a decimal value");
-            } else if (col_data.type.equals("TEXT")) {
-                value_field.setPromptText("Enter text");
-            } else if (col_data.type.equals("DATE")) {
-                value_field.setPromptText("Enter a date");
-            }
-
-            view.getChildren().add(
-                new HBox(10, new Label(col_name + ":"), value_field)
-            );
         }
 
         Button apply_button = new Button("Apply the changes");
@@ -455,6 +511,23 @@ public class ClientApp extends Application {
 
             for (int i = 0; i < column_names.length; i++) {
                 HBox column = (HBox) view.getChildren().get(i);
+                Node input = column.getChildren().get(1);
+
+                if (input instanceof Label) {
+                    Label label = (Label) input;
+
+                    if (label.getUserData().equals("fk")) {
+                        col_values.add(
+                            getKeyFromReplacement(
+                                column_names[i],
+                                label.getText()
+                            )
+                        );
+                    } else {
+                        col_values.add(label.getText());
+                    }
+                    continue;
+                }
 
                 TextField col_value = (TextField) column.getChildren().get(1);
 
@@ -501,9 +574,12 @@ public class ClientApp extends Application {
         });
 
         view.getChildren().add(apply_button);
-
-        root.setScene(new Scene(view, 400, 300));
-        root.show();
+        try {
+            root.setScene(new Scene(view, 400, 300));
+            root.show();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private String[] getFiltersForTable(String table_name) {
@@ -799,6 +875,39 @@ public class ClientApp extends Application {
             value_field.getText(),
             special_filed.getValue()
         );
+    }
+
+    private void parseFKeys(String key_string) {
+        forein_keys.clear();
+
+        if (key_string.length() == 0) return;
+
+        String[] key_parts = key_string.split(":::", -1);
+
+        for (int i = 0; i < key_parts.length; ) {
+            String column_name = key_parts[i++];
+            Map<String, String> value_pairs = new HashMap<>();
+
+            for (String value_str : key_parts[i++].split("&&&", -1)) {
+                if (value_str.equals("")) continue;
+
+                String[] value_parts = value_str.split("%%%", -1);
+
+                value_pairs.put(value_parts[0], value_parts[1]);
+            }
+
+            forein_keys.put(column_name, value_pairs);
+        }
+    }
+
+    private String getKeyFromReplacement(String col_name, String replacement) {
+        for (Map.Entry<String, String> entry : forein_keys
+            .get(col_name)
+            .entrySet()) {
+            if (entry.getValue().equals(replacement)) return entry.getKey();
+        }
+
+        return "NULL";
     }
 }
 

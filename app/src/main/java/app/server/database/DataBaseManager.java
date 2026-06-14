@@ -3,9 +3,26 @@ package app.server.database;
 import app.generic.helpers.DBContext;
 import app.generic.objects.GenericObject;
 import java.sql.*;
+import java.util.HashMap;
 import java.util.Map;
 
 public class DataBaseManager {
+
+    private static Map<String, String> keys_replace = new HashMap<>();
+
+    static {
+        keys_replace.put("id_employee", "empl_surname || ' ' || empl_name");
+
+        keys_replace.put("card_number", "cust_surname || ' ' || cust_name");
+
+        keys_replace.put("category_number", "category_name");
+
+        keys_replace.put("id_product", "product_name");
+
+        keys_replace.put("check_number", "check_number");
+
+        keys_replace.put("UPC_prom", "UPC");
+    }
 
     private static boolean DEBUG = true;
 
@@ -239,5 +256,15 @@ public class DataBaseManager {
         }
 
         return false;
+    }
+
+    public static String getColValues(String from_table, String col_replace) {
+        String sql = "select " + col_replace + ", ";
+        String replace = keys_replace.get(col_replace);
+
+        sql += replace + " ";
+
+        sql += "from \"" + from_table + "\"";
+        return sql;
     }
 }

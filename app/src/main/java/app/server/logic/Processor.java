@@ -4,6 +4,7 @@ import static app.server.database.DataBaseManager.*;
 
 import app.generic.helpers.*;
 import app.generic.objects.GenericObject;
+import app.server.database.DataBaseManager;
 import java.sql.*;
 import java.util.HashMap;
 import java.util.Map;
@@ -109,6 +110,8 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                             ? "nullable"
                             : "notnull");
                 }
+
+                responce.message += ";;;" + handleForeinKeys(db_context.table);
 
                 while (rs.next()) {
                     responce.message += ";;;";
@@ -381,5 +384,56 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         }
 
         return false;
+    }
+
+    public String handleForeinKeys(String table_name) throws SQLException {
+        ResultSet rs = connection
+            .createStatement()
+            .executeQuery("PRAGMA foreign_key_list('" + table_name + "')");
+
+        String keys = "";
+
+        // col:::val1&&&val2:::col2:::valu1&&&val2:::...
+
+        while (rs.next()) {
+            keys +=
+                ":::" +
+                getKeyReplace(rs.getString("table"), rs.getString("from"));
+
+            System.out.println(
+                rs.getString("from") +
+                    " -> " +
+                    rs.getString("to") +
+                    " at " +
+                    rs.getString("table")
+            );
+        }
+
+        if (keys.length() == 0) return "";
+
+        return keys.substring(3);
+    }
+
+    private String getKeyReplace(String from_table, String col_replace)
+        throws SQLException {
+        ResultSet rs = connection
+            .createStatement()
+            .executeQuery(
+                DataBaseManager.getColValues(from_table, col_replace)
+            );
+
+        String ret = col_replace + ":::";
+
+        while (rs.next()) {
+            String real_val = rs.getString(1);
+            String replace_val = rs.getString(2);
+
+            if (replace_val == null) replace_val = "NULL";
+
+            ret += real_val + "%%%" + replace_val + "&&&";
+        }
+
+        if (ret.equals(col_replace + ":::")) return ret;
+        return ret.substring(0, ret.length() - 3);
     }
 }
