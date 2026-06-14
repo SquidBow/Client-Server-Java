@@ -8,6 +8,7 @@ import app.client.helpers.DataBaseHelpers;
 import app.client.helpers.RequestFilter;
 import app.client.network.tcp.ActualClient;
 import app.generic.helpers.*;
+import java.time.LocalDateTime;
 import java.util.*;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -15,10 +16,12 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
+import javafx.print.PrinterJob;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.scene.web.WebView;
 import javafx.stage.Stage;
 
 public class ClientApp extends Application {
@@ -35,6 +38,13 @@ public class ClientApp extends Application {
         TABLES.put("Product", new String[] { "id_product" });
         TABLES.put("Sale", new String[] { "UPC", "check_number" });
         TABLES.put("Store_Product", new String[] { "UPC" });
+    }
+
+    private static Map<String, String> special_queries = new HashMap<>();
+
+    static {
+        special_queries.put("(Special) Taras's earnings in Lviv", "1");
+        special_queries.put("(Special) Customers of all cashiers", "2");
     }
 
     private String first_table = "Employee";
@@ -83,6 +93,8 @@ public class ClientApp extends Application {
         //Table selector
         ComboBox<String> table_selector = new ComboBox<>();
         table_selector.getItems().addAll(TABLES.keySet());
+        table_selector.getItems().addAll(special_queries.keySet());
+
         table_selector.setValue(first_table);
 
         //Filter button
@@ -94,10 +106,11 @@ public class ClientApp extends Application {
         HBox top_bar;
 
         if (
-            client_info.role.equals("Manager") ||
-            first_table.equals("Sale") ||
-            first_table.equals("Check") ||
-            first_table.equals("Customer_Card")
+            !table_selector.getValue().startsWith("(Special)") &&
+            (client_info.role.equals("Manager") ||
+                first_table.equals("Sale") ||
+                first_table.equals("Check") ||
+                first_table.equals("Customer_Card"))
         ) {
             Button insert_button = new Button("Insert entry");
 
@@ -116,7 +129,12 @@ public class ClientApp extends Application {
 
                 String[] values = new String[column_names.length];
                 for (int i = 0; i < column_names.length; i++) {
-                    values[i] = row.get(i);
+                    if (forein_keys.containsKey(column_names[i])) {
+                        String val = row.get(i);
+                        values[i] = getKeyFromReplacement(column_names[i], val);
+                    } else {
+                        values[i] = row.get(i);
+                    }
                 }
 
                 String message = DataBaseHelpers.encodeDBObjectContext(
@@ -150,6 +168,12 @@ public class ClientApp extends Application {
                 }
             });
 
+            Button print_button = new Button("Print table");
+
+            print_button.setOnAction(e ->
+                showPrintWindow(table_selector.getValue())
+            );
+
             top_bar = new HBox(
                 10,
                 new Label("Table:"),
@@ -157,15 +181,20 @@ public class ClientApp extends Application {
                 filter_button,
                 insert_button,
                 update_button,
-                delete_button
+                delete_button,
+                print_button
             );
         } else {
-            top_bar = new HBox(
-                10,
-                new Label("Table:"),
-                table_selector,
-                filter_button
-            );
+            if (!table_selector.getValue().startsWith("(Special)")) {
+                top_bar = new HBox(
+                    10,
+                    new Label("Table:"),
+                    table_selector,
+                    filter_button
+                );
+            } else {
+                top_bar = new HBox(10, new Label("Table:"), table_selector);
+            }
         }
 
         top_bar.setPadding(new Insets(10));
@@ -187,26 +216,35 @@ public class ClientApp extends Application {
     private void loadTable(String table_name) {
         new Thread(() -> {
             try {
-                String[] table_filters = getFiltersForTable(table_name);
+                String responce_body = "";
 
-                String responce_body = actual_client
-                    .sendRequest(
-                        new Message(
-                            1,
-                            client_info.id,
-                            DataBaseHelpers.encodeDBContext(
-                                new DBContext(
-                                    table_name,
-                                    table_filters,
-                                    1000,
-                                    0,
-                                    null,
-                                    false
+                if (table_name.startsWith("(Special)")) {
+                    String request_id = special_queries.get(table_name);
+                    responce_body = actual_client
+                        .sendRequest(new Message(5, client_info.id, request_id))
+                        .message;
+                } else {
+                    String[] table_filters = getFiltersForTable(table_name);
+
+                    responce_body = actual_client
+                        .sendRequest(
+                            new Message(
+                                1,
+                                client_info.id,
+                                DataBaseHelpers.encodeDBContext(
+                                    new DBContext(
+                                        table_name,
+                                        table_filters,
+                                        1000,
+                                        0,
+                                        null,
+                                        false
+                                    )
                                 )
                             )
                         )
-                    )
-                    .message;
+                        .message;
+                }
 
                 System.out.println(
                     "Got responce on 1: " + responce_body + "\n"
@@ -233,6 +271,15 @@ public class ClientApp extends Application {
                 //Start from 2 cause forein_keys are at [1]
                 for (int i = 2; i < data.length; i++) {
                     String[] cells = data[i].split(":::", -1);
+
+                    for (int j = 0; j < cells.length; j++) {
+                        if (forein_keys.containsKey(column_names[j])) {
+                            String display = forein_keys
+                                .get(column_names[j])
+                                .get(cells[j]);
+                            if (display != null) cells[j] = display;
+                        }
+                    }
 
                     rows.add(FXCollections.observableArrayList(cells));
                 }
@@ -908,6 +955,67 @@ public class ClientApp extends Application {
         }
 
         return "NULL";
+    }
+
+    private void showPrintWindow(String table_name) {
+        Stage root = new Stage();
+        VBox view = new VBox();
+        WebView web_view = new WebView();
+
+        String html = buildReportHtml(table_name);
+        web_view.getEngine().loadContent(html);
+
+        view.getChildren().add(web_view);
+
+        Button print_button = new Button("Print");
+        print_button.setOnAction(e -> {
+            PrinterJob job = PrinterJob.createPrinterJob();
+            if (job != null && job.showPrintDialog(root)) {
+                web_view.getEngine().print(job);
+                job.endJob();
+            }
+        });
+
+        HBox bottom = new HBox(print_button);
+        bottom.setAlignment(javafx.geometry.Pos.CENTER);
+        view.getChildren().add(bottom);
+
+        root.setScene(new Scene(view, 900, 700));
+        root.show();
+    }
+
+    private String buildReportHtml(String table_name) {
+        StringBuilder html = new StringBuilder();
+        html.append("<html><head><style>");
+        html.append("body { font-family: Arial, sans-serif; margin: 20px; }");
+        html.append("table { width: 100%; border-collapse: collapse; }");
+        html.append(
+            "th, td { border: 1px solid black; padding: 6px; text-align: left; }"
+        );
+        html.append("th { background: #e0e0e0; }");
+        html.append("@media print { .no-print { display: none; } }");
+        html.append("</style></head><body>");
+        html.append(
+            "<div style='text-align:center; font-size:20px; font-weight:bold; margin-bottom:20px;'>"
+        );
+        html.append("Report: ").append(table_name).append("</div>");
+        html.append("<table><tr>");
+        for (String col : column_names)
+            html.append("<th>").append(col).append("</th>");
+        html.append("</tr>");
+        for (ObservableList<String> row : table_view.getItems()) {
+            html.append("<tr>");
+            for (String cell : row)
+                html.append("<td>").append(cell).append("</td>");
+            html.append("</tr>");
+        }
+        html.append("</table>");
+        html.append(
+            "<div style='text-align:center; margin-top:20px; font-size:12px; color:gray;'>"
+        );
+        html.append("Generated: ").append(LocalDateTime.now()).append("</div>");
+        html.append("</body></html>");
+        return html.toString();
     }
 }
 

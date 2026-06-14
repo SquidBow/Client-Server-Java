@@ -51,7 +51,7 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         Message responce = new Message();
         responce.command_id = message.command_id;
         responce.user_id = message.user_id;
-        responce.message = "OK";
+        responce.message = "Unknown command id";
 
         System.out.println(
             "Processing message:\nCommand_id: " +
@@ -62,135 +62,18 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                 message.message
         );
 
-        //TODO: ALL THAT NEEDS TO BE REFACTORED INTO DIFFERENT FUNCTIONS
-
-        // Maybe add auth to this when we execute command check for the right
         // Search is 1
         if (message.command_id == 1) {
-            // Get the table cause, I mean, that is what you sometimes have to do, yeah,
-            // imagine, crazy, that's just incredible, truly an unforgettable experience
-
             DBContext db_context = createDBContext(message.message);
-
-            try (
-                PreparedStatement ps = connection.prepareStatement(
-                    createSelectStatement(db_context)
-                )
-            ) {
-                int i = 1;
-
-                for (String filter : db_context.filters) {
-                    String[] parts = filter.split("&&&");
-                    if (!parts[0].endsWith("is null")) {
-                        ps.setObject(i++, parts[1]);
-                    }
-                }
-
-                ps.setObject(i++, db_context.limit);
-                ps.setObject(i++, db_context.offset);
-
-                ResultSet rs = ps.executeQuery();
-
-                ResultSetMetaData meta_data = rs.getMetaData();
-                int column_count = meta_data.getColumnCount();
-
-                responce.message = "";
-
-                for (int col = 1; col <= column_count; col++) {
-                    String col_name = meta_data.getColumnName(col);
-                    if (col_name.equals("password")) continue;
-
-                    if (col > 1) responce.message += (":::");
-                    responce.message +=
-                        col_name +
-                        "&&&" +
-                        meta_data.getColumnTypeName(col) +
-                        "&&&" +
-                        (meta_data.isNullable(col) == 1
-                            ? "nullable"
-                            : "notnull");
-                }
-
-                responce.message += ";;;" + handleForeinKeys(db_context.table);
-
-                while (rs.next()) {
-                    responce.message += ";;;";
-
-                    for (int col = 1; col <= column_count; col++) {
-                        String col_name = meta_data.getColumnName(col);
-                        if (col_name.equals("password")) continue;
-
-                        if (col > 1) responce.message += ":::";
-
-                        Object val = rs.getObject(col);
-                        responce.message +=
-                            val == null ? "NULL" : val.toString();
-                    }
-                }
-            } catch (SQLException e) {
-                throw new RuntimeException(
-                    "Smth has failed with executing query on getting some item: " +
-                        e.getMessage()
-                );
-            }
+            responce.message = selectQuery(db_context);
         }
-        // 2 or 3 because already passign the object with updated values so they are the
-        // same
         // Update is 2
         else if (message.command_id == 2) {
-            // Idk what message is for cause will have all information from the object
-            // itself
-
-            // (Later) Apperantly I was wrong cause message is so important like bro, it caries the
-            // context
-
             DBObjectContext object_context = createDBObjectContext(
                 message.message
             );
 
-            if (!verifyPermissions(context.user_role, object_context.table)) {
-                responce.message = "Operation not permitted";
-                sendMessage(responce);
-
-                return;
-            }
-
-            try (
-                PreparedStatement ps = connection.prepareStatement(
-                    createUpdateStatement(
-                        object_context.table,
-                        object_context.object
-                    )
-                )
-            ) {
-                int i = 0;
-
-                for (Map.Entry<String, Object> entry : object_context.object
-                    .getMap()
-                    .entrySet()) {
-                    if (
-                        !contains(
-                            entry.getKey(),
-                            object_context.object.getPrimaryKeys()
-                        )
-                    ) {
-                        ps.setObject(++i, entry.getValue());
-                    }
-                }
-
-                for (Object val : object_context.object.getPrimaryValues()) {
-                    ps.setObject(++i, val);
-                }
-
-                int rows = ps.executeUpdate();
-
-                responce.message = rows > 0 ? "Ok" : "Item not found";
-            } catch (SQLException e) {
-                throw new RuntimeException(
-                    "Smth has failed with executing query on updating some item: " +
-                        e.getMessage()
-                );
-            }
+            responce.message = updateQuery(object_context);
         }
         // Insert is 3
         else if (message.command_id == 3) {
@@ -198,82 +81,257 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                 message.message
             );
 
-            if (!verifyPermissions(context.user_role, object_context.table)) {
-                responce.message = "Operation not permitted";
-                sendMessage(responce);
-
-                return;
-            }
-
-            try (
-                PreparedStatement ps = connection.prepareStatement(
-                    createInsertStatement(
-                        object_context.table,
-                        object_context.object
-                    )
-                )
-            ) {
-                int i = 0;
-
-                for (Object val : object_context.object.getMap().values()) {
-                    if (val.toString().equals("NULL")) {
-                        ps.setNull(++i, Types.NULL);
-                    } else {
-                        ps.setObject(++i, val);
-                    }
-                }
-
-                int rows = ps.executeUpdate();
-
-                responce.message =
-                    rows > 0 ? "Ok" : "Failed to create it for some reason.";
-            } catch (SQLException e) {
-                throw new RuntimeException(
-                    "Smth has failed with executing query on inserting some item: " +
-                        e.getMessage()
-                );
-            }
+            responce.message = insertQuery(object_context);
         }
-        // Add 4 as an update
+        // Delete is 4
         else if (message.command_id == 4) {
             DBObjectContext object_context = createDBObjectContext(
                 message.message
             );
 
-            if (!verifyPermissions(context.user_role, object_context.table)) {
-                responce.message = "Operation not permitted";
-                sendMessage(responce);
-
-                return;
-            }
-
-            try (
-                PreparedStatement ps = connection.prepareStatement(
-                    createDeleteStatement(
-                        object_context.table,
-                        object_context.object.getPrimaryKeys()
-                    )
-                )
-            ) {
-                int i = 0;
-
-                for (String key : object_context.object.getPrimaryKeys()) {
-                    ps.setObject(++i, object_context.object.getMap().get(key));
-                }
-
-                int rows = ps.executeUpdate();
-
-                responce.message =
-                    rows > 0 ? "Ok" : "Failed to create it for some reason.";
-            } catch (SQLException e) {
-                throw new RuntimeException(
-                    "Smth has failed with executing query on deleting some item: " +
-                        e.getMessage()
-                );
+            responce.message = deleteQuery(object_context);
+        }
+        // Special prewritten queries is 5
+        else if (message.command_id == 5) {
+            if (message.message.equals("1")) {
+                responce.message = specialQuery1();
+            } else if (message.message.equals("2")) {
+                responce.message = specialQuery2();
             }
         }
 
         sendMessage(responce);
+    }
+
+    private String selectQuery(DBContext db_context) {
+        // Get the table cause, I mean, that is what you sometimes have to do, yeah,
+        // imagine, crazy, that's just incredible, truly an unforgettable experience
+        String responce = "";
+
+        try (
+            PreparedStatement ps = connection.prepareStatement(
+                createSelectStatement(db_context)
+            )
+        ) {
+            int i = 1;
+
+            for (String filter : db_context.filters) {
+                String[] parts = filter.split("&&&");
+                if (!parts[0].endsWith("is null")) {
+                    ps.setObject(i++, parts[1]);
+                }
+            }
+
+            ps.setObject(i++, db_context.limit);
+            ps.setObject(i++, db_context.offset);
+
+            ResultSet rs = ps.executeQuery();
+
+            ResultSetMetaData meta_data = rs.getMetaData();
+            int column_count = meta_data.getColumnCount();
+
+            for (int col = 1; col <= column_count; col++) {
+                String col_name = meta_data.getColumnName(col);
+                if (col_name.equals("password")) continue;
+
+                if (col > 1) responce += (":::");
+                responce +=
+                    col_name +
+                    "&&&" +
+                    meta_data.getColumnTypeName(col) +
+                    "&&&" +
+                    (meta_data.isNullable(col) == 1 ? "nullable" : "notnull");
+            }
+
+            responce += ";;;" + handleForeinKeys(db_context.table);
+
+            while (rs.next()) {
+                responce += ";;;";
+
+                for (int col = 1; col <= column_count; col++) {
+                    String col_name = meta_data.getColumnName(col);
+                    if (col_name.equals("password")) continue;
+
+                    if (col > 1) responce += ":::";
+
+                    Object val = rs.getObject(col);
+                    responce += val == null ? "NULL" : val.toString();
+                }
+            }
+
+            return responce;
+        } catch (SQLException e) {
+            throw new RuntimeException(
+                "Smth has failed with executing query on getting some item: " +
+                    e.getMessage()
+            );
+        }
+    }
+
+    private String updateQuery(DBObjectContext object_context) {
+        // String responce = "";
+
+        if (!verifyPermissions(context.user_role, object_context.table)) {
+            // responce = "Operation not permitted";
+            // sendMessage(responce);
+
+            return "Operation not permitted";
+        }
+
+        try (
+            PreparedStatement ps = connection.prepareStatement(
+                createUpdateStatement(
+                    object_context.table,
+                    object_context.object
+                )
+            )
+        ) {
+            int i = 0;
+
+            for (Map.Entry<String, Object> entry : object_context.object
+                .getMap()
+                .entrySet()) {
+                if (
+                    !contains(
+                        entry.getKey(),
+                        object_context.object.getPrimaryKeys()
+                    )
+                ) {
+                    ps.setObject(++i, entry.getValue());
+                }
+            }
+
+            for (Object val : object_context.object.getPrimaryValues()) {
+                ps.setObject(++i, val);
+            }
+
+            int rows = ps.executeUpdate();
+
+            return rows > 0 ? "Ok" : "Item not found";
+            // return responce;
+        } catch (SQLException e) {
+            throw new RuntimeException(
+                "Smth has failed with executing query on updating some item: " +
+                    e.getMessage()
+            );
+        }
+    }
+
+    private String insertQuery(DBObjectContext object_context) {
+        if (!verifyPermissions(context.user_role, object_context.table)) {
+            // responce.message = "Operation not permitted";
+            // sendMessage(responce);
+
+            return "Operation not permitted";
+        }
+
+        try (
+            PreparedStatement ps = connection.prepareStatement(
+                createInsertStatement(
+                    object_context.table,
+                    object_context.object
+                )
+            )
+        ) {
+            int i = 0;
+
+            for (Object val : object_context.object.getMap().values()) {
+                if (val.toString().equals("NULL")) {
+                    ps.setNull(++i, Types.NULL);
+                } else {
+                    ps.setObject(++i, val);
+                }
+            }
+
+            int rows = ps.executeUpdate();
+
+            return rows > 0 ? "Ok" : "Failed to create it for some reason.";
+        } catch (SQLException e) {
+            throw new RuntimeException(
+                "Smth has failed with executing query on inserting some item: " +
+                    e.getMessage()
+            );
+        }
+    }
+
+    private String deleteQuery(DBObjectContext object_context) {
+        if (!verifyPermissions(context.user_role, object_context.table)) {
+            return "Operation not permitted";
+        }
+
+        try (
+            PreparedStatement ps = connection.prepareStatement(
+                createDeleteStatement(
+                    object_context.table,
+                    object_context.object.getPrimaryKeys()
+                )
+            )
+        ) {
+            int i = 0;
+
+            for (String key : object_context.object.getPrimaryKeys()) {
+                ps.setObject(++i, object_context.object.getMap().get(key));
+            }
+
+            int rows = ps.executeUpdate();
+
+            return rows > 0 ? "Ok" : "Failed to create it for some reason.";
+        } catch (SQLException e) {
+            throw new RuntimeException(
+                "Smth has failed with executing query on deleting some item: " +
+                    e.getMessage()
+            );
+        }
+    }
+
+    private String specialQuery1() {
+        String sql =
+            "SELECT e.empl_surname || ' ' || e.empl_name, SUM(c.sum_total) FROM \"Check\" c JOIN Employee e ON c.id_employee = e.id_employee JOIN Customer_Card cc ON c.card_number = cc.card_number WHERE cc.city = ? AND e.empl_name = ? GROUP BY e.id_employee";
+
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, "Lviv");
+            ps.setString(2, "Taras");
+            ResultSet rs = ps.executeQuery();
+            return formatResult(rs, "Employee Name", "Total Earnings");
+        } catch (SQLException e) {
+            throw new RuntimeException("Query 1 failed: " + e.getMessage());
+        }
+    }
+
+    private String specialQuery2() {
+        String sql =
+            "SELECT DISTINCT cc.cust_surname || ' ' || cc.cust_name FROM Customer_Card cc WHERE cc.card_number IN ( SELECT c.card_number FROM \"Check\" c WHERE NOT EXISTS ( SELECT 1 FROM Employee e WHERE e.empl_role = 'Cashier' AND NOT EXISTS ( SELECT 1 FROM \"Check\" c2 WHERE c2.card_number = c.card_number AND c2.id_employee = e.id_employee)))";
+
+        try (Statement stmt = connection.createStatement()) {
+            ResultSet rs = stmt.executeQuery(sql);
+            return formatResult(rs, "Customer Name");
+        } catch (SQLException e) {
+            throw new RuntimeException("Query 2 failed: " + e.getMessage());
+        }
+    }
+
+    private String formatResult(ResultSet rs, String... columnNames)
+        throws SQLException {
+        int cols = columnNames.length;
+        String result = "";
+
+        for (int i = 0; i < cols; i++) {
+            if (i > 0) result += ":::";
+            result += columnNames[i] + "&&&TEXT&&&null&&&null&&&null&&&notnull";
+        }
+
+        result += ";;;";
+
+        while (rs.next()) {
+            result += ";;;";
+            for (int i = 0; i < cols; i++) {
+                if (i > 0) result += ":::";
+                Object val = rs.getObject(i + 1);
+                result += val == null ? "NULL" : val.toString();
+            }
+        }
+
+        return result;
     }
 
     private boolean verifyPermissions(String empl_role, String table) {

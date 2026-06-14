@@ -152,8 +152,50 @@ public class DataBaseManager {
                             VALUES ('2', 'User', 'User', 'Cashier', 5000, '01.01.1995', '01.01.2022', '+380000000001', 'Kyiv', 'Side', '01002', '04f8996da763b7a969b1028ee3007569eaf3a635486ddab211d512c85b9df8fb');
                             """
                         );
+                        stmt.execute(
+                            """
+                            INSERT INTO Employee (id_employee, empl_surname, empl_name, empl_role, salary, date_of_birth, date_of_start, phone_number, city, street, zip_code, password)
+                            VALUES ('3', 'Taras', 'Taras', 'Cashier', 6000, '01.01.1993', '01.01.2021', '+380000000002', 'Lviv', 'Main', '79000', '04f8996da763b7a969b1028ee3007569eaf3a635486ddab211d512c85b9df8fb');
+                            """
+                        );
+                        stmt.execute(
+                            """
+                            INSERT INTO Customer_Card (card_number, cust_surname, cust_name, phone_number, city, percent)
+                            VALUES ('1111', 'Ivanov', 'Ivan', '+380000000003', 'Lviv', 5);
+                            """
+                        );
+                        stmt.execute(
+                            """
+                            INSERT INTO Customer_Card (card_number, cust_surname, cust_name, phone_number, city, percent)
+                            VALUES ('2222', 'Petrov', 'Petro', '+380000000004', 'Lviv', 10);
+                            """
+                        );
+                        stmt.execute(
+                            """
+                            INSERT INTO "Check" (check_number, id_employee, card_number, print_date, sum_total, vat)
+                            VALUES ('1001', '3', '1111', '01.01.2023', 500, 100);
+                            """
+                        );
+                        stmt.execute(
+                            """
+                            INSERT INTO "Check" (check_number, id_employee, card_number, print_date, sum_total, vat)
+                            VALUES ('1002', '3', '1111', '02.01.2023', 300, 60);
+                            """
+                        );
+                        stmt.execute(
+                            """
+                            INSERT INTO "Check" (check_number, id_employee, card_number, print_date, sum_total, vat)
+                            VALUES ('1003', '2', '2222', '03.01.2023', 200, 40);
+                            """
+                        );
+                        stmt.execute(
+                            """
+                            INSERT INTO "Check" (check_number, id_employee, card_number, print_date, sum_total, vat)
+                            VALUES ('1004', '2', '1111', '04.01.2023', 150, 30);
+                            """
+                        );
                         System.out.println(
-                            "Test employees added: Admin (ID: 1, Pass: admin), User (ID: 2, Pass: user)"
+                            "Test employees added: Admin (ID: 1, Pass: admin), User (ID: 2, Pass: user), Taras (ID: 3, Pass: user)"
                         );
                     }
                 }
