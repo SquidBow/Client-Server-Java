@@ -93,9 +93,13 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         }
         // Special prewritten queries is 5
         else if (message.command_id == 5) {
-            if (message.message.equals("1")) {
-                responce.message = specialQuery1();
-            } else if (message.message.equals("2")) {
+            // System.out.println("\n\nMessage: " + message.message + "\n\n\n");
+
+            if (message.message.startsWith("1")) {
+                responce.message = specialQuery1(
+                    message.message.split(";;;", -1)
+                );
+            } else if (message.message.startsWith("2")) {
                 responce.message = specialQuery2();
             }
         }
@@ -284,15 +288,45 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         }
     }
 
-    private String specialQuery1() {
+    private String specialQuery1(String[] message) {
+        // System.out.println("\n\n\n" + message.length + "\n\n\n");
+
         String sql =
-            "SELECT e.empl_surname || ' ' || e.empl_name, SUM(c.sum_total) FROM \"Check\" c JOIN Employee e ON c.id_employee = e.id_employee JOIN Customer_Card cc ON c.card_number = cc.card_number WHERE cc.city = ? AND e.empl_name = ? GROUP BY e.id_employee";
+            "select e.empl_surname, e.empl_name, cc.city, sum(c.sum_total) from \"Check\" c join Employee e on c.id_employee = e.id_employee join Customer_Card cc on c.card_number = cc.card_number where 1=1 ";
+
+        //cc.city = ? AND e.empl_name = ? GROUP BY e.id_employee";
+
+        if (!message[1].isBlank()) {
+            sql += "and e.empl_name=?";
+        }
+
+        if (!message[2].isBlank()) {
+            sql += "and e.empl_surname=?";
+        }
+
+        if (!message[3].isBlank()) {
+            sql += "and cc.city=?";
+        }
+
+        sql += " GROUP BY e.id_employee";
 
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
-            ps.setString(1, "Lviv");
-            ps.setString(2, "Taras");
+            int i = 1;
+
+            if (!message[1].isBlank()) {
+                ps.setString(i++, message[1]);
+            }
+
+            if (!message[2].isBlank()) {
+                ps.setString(i++, message[2]);
+            }
+
+            if (!message[3].isBlank()) {
+                ps.setString(i++, message[3]);
+            }
+
             ResultSet rs = ps.executeQuery();
-            return formatResult(rs, "Employee Name", "Total Earnings");
+            return formatResult(rs, "Surname", "Name", "City", "Earnings");
         } catch (SQLException e) {
             throw new RuntimeException("Query 1 failed: " + e.getMessage());
         }

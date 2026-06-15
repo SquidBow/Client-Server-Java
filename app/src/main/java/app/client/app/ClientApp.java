@@ -43,11 +43,11 @@ public class ClientApp extends Application {
     private static Map<String, String> special_queries = new HashMap<>();
 
     static {
-        special_queries.put("(Special) Taras's earnings in Lviv", "1");
+        special_queries.put("(Special) Employee's earnings in a city", "1");
         special_queries.put("(Special) Customers of all cashiers", "2");
     }
 
-    private String first_table = "Employee";
+    private String load_table = "Employee";
 
     private static ClientInfo client_info;
     private List<ColumnData> columns = new ArrayList<>();
@@ -95,22 +95,118 @@ public class ClientApp extends Application {
         table_selector.getItems().addAll(TABLES.keySet());
         table_selector.getItems().addAll(special_queries.keySet());
 
-        table_selector.setValue(first_table);
+        table_selector.setValue(load_table);
 
-        //Filter button
+        HBox top_bar;
+
+        if (table_selector.getValue().startsWith("(Special)")) {
+            top_bar = handleSpecialReuqests(table_selector);
+        } else {
+            top_bar = handleNormalRequests(table_selector);
+        }
+
+        top_bar.setPadding(new Insets(10));
+
+        BorderPane root = new BorderPane();
+        root.setTop(top_bar);
+        root.setCenter(table_view);
+
+        table_selector.valueProperty().addListener((obs, old_val, new_val) -> {
+            HBox new_top_bar;
+
+            if (new_val.startsWith("(Special)")) {
+                new_top_bar = handleSpecialReuqests(table_selector);
+            } else {
+                new_top_bar = handleNormalRequests(table_selector);
+            }
+
+            new_top_bar.setPadding(new Insets(10));
+            root.setTop(new_top_bar);
+
+            load_table = new_val;
+        });
+
+        primary_stage.setScene(new Scene(root, 900, 600));
+        primary_stage.show();
+    }
+
+    private HBox handleSpecialReuqests(ComboBox<String> table_selector) {
+        int request_id = Integer.parseInt(
+            special_queries.get(table_selector.getValue())
+        );
+
+        Message request_message = new Message(5, client_info.id, "");
+        HBox top_bar;
+
         Button filter_button = new Button("Filters");
         filter_button.setOnAction(e -> {
             showFilterWindow(table_selector.getValue());
         });
 
+        if (request_id == 1) {
+            TextField employee_surname = new TextField();
+            employee_surname.setPromptText(
+                "Enter the emplyee surname to search"
+            );
+
+            TextField employee_name = new TextField();
+            employee_name.setPromptText("Enter the emplyee name to search");
+
+            TextField city_field = new TextField();
+            city_field.setPromptText("Enter the city to search");
+
+            Button query_button = new Button("Find results");
+
+            query_button.setOnAction(e -> {
+                request_message.message =
+                    "1;;;" +
+                    employee_name.getText() +
+                    ";;;" +
+                    employee_surname.getText() +
+                    ";;;" +
+                    city_field.getText();
+
+                // System.out.println("\n\n\nRequest: " + request + "\n\n\n");
+                loadTable(table_selector.getValue(), request_message);
+            });
+
+            request_message.message = "1;;;;;;;;;";
+
+            top_bar = new HBox(
+                10,
+                new Label("Table:"),
+                table_selector,
+                employee_surname,
+                employee_name,
+                city_field,
+                query_button
+            );
+        } else if (request_id == 2) {
+            top_bar = new HBox(10, new Label("Table:"), table_selector);
+            request_message.message = "2";
+        } else {
+            //Unrechable
+            top_bar = new HBox(10, new Label("Table:"), table_selector);
+        }
+
+        loadTable(table_selector.getValue(), request_message);
+        return top_bar;
+    }
+
+    private HBox handleNormalRequests(ComboBox<String> table_selector) {
+        //Filter button
         HBox top_bar;
 
+        Button filter_button = new Button("Filters");
+        filter_button.setOnAction(e -> {
+            showFilterWindow(table_selector.getValue());
+        });
+
         if (
-            !table_selector.getValue().startsWith("(Special)") &&
-            (client_info.role.equals("Manager") ||
-                first_table.equals("Sale") ||
-                first_table.equals("Check") ||
-                first_table.equals("Customer_Card"))
+            client_info.role.equals("Manager") ||
+            load_table.equals("Sale") ||
+            load_table.equals("Check") ||
+            load_table.equals("Customer_Card")
         ) {
             Button insert_button = new Button("Insert entry");
 
@@ -137,7 +233,7 @@ public class ClientApp extends Application {
                     }
                 }
 
-                String message = DataBaseHelpers.encodeDBObjectContext(
+                String delete_message = DataBaseHelpers.encodeDBObjectContext(
                     table_selector.getValue(),
                     TABLES.get(table_selector.getValue()),
                     column_names,
@@ -146,10 +242,8 @@ public class ClientApp extends Application {
 
                 try {
                     actual_client.sendRequest(
-                        new Message(4, client_info.id, message)
+                        new Message(4, client_info.id, delete_message)
                     );
-
-                    loadTable(table_selector.getValue());
                 } catch (Exception ex) {
                     ex.printStackTrace();
                 }
@@ -185,66 +279,23 @@ public class ClientApp extends Application {
                 print_button
             );
         } else {
-            if (!table_selector.getValue().startsWith("(Special)")) {
-                top_bar = new HBox(
-                    10,
-                    new Label("Table:"),
-                    table_selector,
-                    filter_button
-                );
-            } else {
-                top_bar = new HBox(10, new Label("Table:"), table_selector);
-            }
+            top_bar = new HBox(
+                10,
+                new Label("Table:"),
+                table_selector,
+                filter_button
+            );
         }
 
-        top_bar.setPadding(new Insets(10));
+        loadTable(table_selector.getValue(), null);
 
-        BorderPane root = new BorderPane();
-        root.setTop(top_bar);
-        root.setCenter(table_view);
-
-        table_selector.valueProperty().addListener((obs, old_val, new_val) -> {
-            if (new_val != null) loadTable(new_val);
-        });
-
-        loadTable(first_table);
-
-        primary_stage.setScene(new Scene(root, 900, 600));
-        primary_stage.show();
+        return top_bar;
     }
 
-    private void loadTable(String table_name) {
+    private void loadTable(String table_name, Message message) {
         new Thread(() -> {
             try {
-                String responce_body = "";
-
-                if (table_name.startsWith("(Special)")) {
-                    String request_id = special_queries.get(table_name);
-                    responce_body = actual_client
-                        .sendRequest(new Message(5, client_info.id, request_id))
-                        .message;
-                } else {
-                    String[] table_filters = getFiltersForTable(table_name);
-
-                    responce_body = actual_client
-                        .sendRequest(
-                            new Message(
-                                1,
-                                client_info.id,
-                                DataBaseHelpers.encodeDBContext(
-                                    new DBContext(
-                                        table_name,
-                                        table_filters,
-                                        1000,
-                                        0,
-                                        null,
-                                        false
-                                    )
-                                )
-                            )
-                        )
-                        .message;
-                }
+                String responce_body = sendRequest(table_name, message);
 
                 System.out.println(
                     "Got responce on 1: " + responce_body + "\n"
@@ -298,6 +349,44 @@ public class ClientApp extends Application {
                 e.printStackTrace();
             }
         }).start();
+    }
+
+    private String sendRequest(String table_name, Message message)
+        throws Exception {
+        if (message != null) {
+            // System.out.println("\n\n\nMessage is not null\n\n\n");
+            // System.out.println("\n\n\nRequest: " + message.message + "\n\n\n");
+            return actual_client.sendRequest(message).message;
+        }
+        // else if (table_name.startsWith("(Special)")) {
+        //     // System.out.println("\n\n\nMessage is null\n\n\n");
+        //     String request_id = special_queries.get(table_name);
+        //     return actual_client
+        //         .sendRequest(new Message(5, client_info.id, request_id))
+        //         .message;
+        // }
+        else {
+            String[] table_filters = getFiltersForTable(table_name);
+
+            return actual_client
+                .sendRequest(
+                    new Message(
+                        1,
+                        client_info.id,
+                        DataBaseHelpers.encodeDBContext(
+                            new DBContext(
+                                table_name,
+                                table_filters,
+                                1000,
+                                0,
+                                null,
+                                false
+                            )
+                        )
+                    )
+                )
+                .message;
+        }
     }
 
     private String[] parseColumns(String str) {
@@ -486,7 +575,7 @@ public class ClientApp extends Application {
                     System.out.println("Responce: " + responce.message);
                     System.out.println("User role is: " + client_info.role);
 
-                    loadTable(table_name);
+                    loadTable(table_name, null);
                     root.close();
                 } catch (Exception ex) {
                     ex.printStackTrace();
@@ -612,7 +701,7 @@ public class ClientApp extends Application {
                     System.out.println("Responce: " + responce.message);
                     System.out.println("User role is: " + client_info.role);
 
-                    loadTable(table_name);
+                    loadTable(table_name, null);
                     root.close();
                 } catch (Exception ex) {
                     ex.printStackTrace();
@@ -794,7 +883,7 @@ public class ClientApp extends Application {
             if (add_to_list) {
                 filters.put(table_name, filter_list);
 
-                loadTable(table_name);
+                loadTable(table_name, null);
 
                 root.close();
             }
