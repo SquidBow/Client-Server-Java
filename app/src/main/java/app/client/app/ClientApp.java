@@ -140,50 +140,26 @@ public class ClientApp extends Application {
 
         Button filter_button = new Button("Filters");
         filter_button.setOnAction(e -> {
-            showFilterWindow(table_selector.getValue());
+            showFilterWindow(table_selector.getValue(), request_message);
         });
 
         if (request_id == 1) {
-            TextField employee_surname = new TextField();
-            employee_surname.setPromptText(
-                "Enter the emplyee surname to search"
-            );
-
-            TextField employee_name = new TextField();
-            employee_name.setPromptText("Enter the emplyee name to search");
-
-            TextField city_field = new TextField();
-            city_field.setPromptText("Enter the city to search");
-
-            Button query_button = new Button("Find results");
-
-            query_button.setOnAction(e -> {
-                request_message.message =
-                    "1;;;" +
-                    employee_name.getText() +
-                    ";;;" +
-                    employee_surname.getText() +
-                    ";;;" +
-                    city_field.getText();
-
-                // System.out.println("\n\n\nRequest: " + request + "\n\n\n");
-                loadTable(table_selector.getValue(), request_message);
-            });
-
-            request_message.message = "1;;;;;;;;;";
+            request_message.message = "1;;;";
 
             top_bar = new HBox(
                 10,
                 new Label("Table:"),
                 table_selector,
-                employee_surname,
-                employee_name,
-                city_field,
-                query_button
+                filter_button
             );
         } else if (request_id == 2) {
-            top_bar = new HBox(10, new Label("Table:"), table_selector);
-            request_message.message = "2";
+            top_bar = new HBox(
+                10,
+                new Label("Table:"),
+                table_selector,
+                filter_button
+            );
+            request_message.message = "2;;;";
         } else {
             //Unrechable
             top_bar = new HBox(10, new Label("Table:"), table_selector);
@@ -199,7 +175,7 @@ public class ClientApp extends Application {
 
         Button filter_button = new Button("Filters");
         filter_button.setOnAction(e -> {
-            showFilterWindow(table_selector.getValue());
+            showFilterWindow(table_selector.getValue(), null);
         });
 
         if (
@@ -298,7 +274,7 @@ public class ClientApp extends Application {
                 String responce_body = sendRequest(table_name, message);
 
                 System.out.println(
-                    "Got responce on 1: " + responce_body + "\n"
+                    "\nGot responce on 1: " + responce_body + "\n"
                 );
 
                 if (responce_body == null) return;
@@ -730,7 +706,13 @@ public class ClientApp extends Application {
             String filter_string = "";
             ColumnData col_data = getColData(filter.col);
 
-            if (
+            if (forein_keys.containsKey(filter.col)) {
+                filter_string = DataBaseHelpers.createFilterStatementWord(
+                    filter.col,
+                    filter.val,
+                    true
+                );
+            } else if (
                 col_data.type.equals("INTEGER") || col_data.type.equals("REAL")
             ) {
                 filter_string = DataBaseHelpers.createFilterStatementInteger(
@@ -758,7 +740,19 @@ public class ClientApp extends Application {
         return all_filters.toArray(new String[0]);
     }
 
-    private void showFilterWindow(String table_name) {
+    private void showFilterWindow(String table_name, Message query_message) {
+        Message message;
+
+        if (query_message == null) {
+            message = null;
+        } else {
+            message = new Message(
+                query_message.command_id,
+                query_message.user_id,
+                query_message.message
+            );
+        }
+
         Stage root = new Stage();
         VBox filter_view = new VBox(10);
 
@@ -773,6 +767,17 @@ public class ClientApp extends Application {
                 cols.setValue(filter.col);
 
                 Node filter_val;
+                HBox filter_box;
+
+                Button delete_button = new Button("X");
+
+                ComboBox<String> filter_special = new ComboBox<>(
+                    FXCollections.observableArrayList(
+                        getSpecialOptions(getColData(filter.col).type)
+                    )
+                );
+
+                filter_special.setValue(filter.special);
 
                 if (forein_keys.containsKey(filter.col)) {
                     ComboBox<String> values = new ComboBox<>(
@@ -786,21 +791,14 @@ public class ClientApp extends Application {
                     );
 
                     filter_val = values;
+
+                    filter_special.setManaged(false);
+                    filter_special.setVisible(false);
                 } else {
                     filter_val = new TextField(filter.val);
                 }
 
-                ComboBox<String> filter_special = new ComboBox<>(
-                    FXCollections.observableArrayList(
-                        getSpecialOptions(getColData(filter.col).type)
-                    )
-                );
-
-                filter_special.setValue(filter.special);
-
-                Button delete_button = new Button("X");
-
-                HBox filter_box = new HBox(
+                filter_box = new HBox(
                     10,
                     cols,
                     filter_val,
@@ -829,6 +827,14 @@ public class ClientApp extends Application {
 
             Node filter_val;
 
+            ComboBox<String> spec = new ComboBox<>(
+                FXCollections.observableArrayList(
+                    getSpecialOptions(getColData(cols.getValue()).type)
+                )
+            );
+
+            spec.setValue(spec.getItems().get(0));
+
             if (forein_keys.containsKey(column_names[0])) {
                 ComboBox<String> values = new ComboBox<>(
                     FXCollections.observableArrayList(
@@ -837,17 +843,12 @@ public class ClientApp extends Application {
                 );
 
                 filter_val = values;
+
+                spec.setManaged(false);
+                spec.setVisible(false);
             } else {
                 filter_val = new TextField();
             }
-
-            ComboBox<String> spec = new ComboBox<>(
-                FXCollections.observableArrayList(
-                    getSpecialOptions(getColData(cols.getValue()).type)
-                )
-            );
-
-            spec.setValue(spec.getItems().get(0));
 
             cols.valueProperty().addListener((obs, old, new_col) -> {
                 Node new_fitler_val;
@@ -860,8 +861,14 @@ public class ClientApp extends Application {
                     );
 
                     new_fitler_val = values;
+
+                    spec.setManaged(false);
+                    spec.setVisible(false);
                 } else {
                     new_fitler_val = new TextField();
+
+                    spec.setManaged(true);
+                    spec.setVisible(true);
                 }
 
                 HBox row = (HBox) cols.getParent();
@@ -894,6 +901,7 @@ public class ClientApp extends Application {
         apply_button.setOnAction(e -> {
             List<RequestFilter> filter_list = new ArrayList<>();
             boolean add_to_list = true;
+            // int index = 0;
 
             for (Node row : filter_view.getChildren()) {
                 if (row instanceof HBox) {
@@ -923,6 +931,18 @@ public class ClientApp extends Application {
                         ).setStyle("");
                     }
 
+                    if (message != null) {
+                        // Get type and then add smth to message based on that
+
+                        // String col_type = columns.get(filter.col);
+                        message.message +=
+                            DataBaseHelpers.createFilterStatementWord(
+                                filter.col,
+                                filter.val,
+                                true
+                            );
+                    }
+
                     filter_list.add(filter);
                 }
             }
@@ -930,7 +950,7 @@ public class ClientApp extends Application {
             if (add_to_list) {
                 filters.put(table_name, filter_list);
 
-                loadTable(table_name, null);
+                loadTable(table_name, message);
 
                 root.close();
             }

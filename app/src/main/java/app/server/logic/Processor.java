@@ -100,7 +100,9 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                     message.message.split(";;;", -1)
                 );
             } else if (message.message.startsWith("2")) {
-                responce.message = specialQuery2();
+                responce.message = specialQuery2(
+                    message.message.split(";;;", -1)
+                );
             }
         }
 
@@ -289,83 +291,147 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
     }
 
     private String specialQuery1(String[] message) {
-        // System.out.println("\n\n\n" + message.length + "\n\n\n");
+        for (String str : message) {
+            System.out.println("\nString: " + str);
+        }
 
         String sql =
-            "select e.empl_surname, e.empl_name, cc.city, sum(c.sum_total) from \"Check\" c join Employee e on c.id_employee = e.id_employee join Customer_Card cc on c.card_number = cc.card_number where 1=1 ";
-
-        //cc.city = ? AND e.empl_name = ? GROUP BY e.id_employee";
+            "select (e.empl_surname ||' '|| e.empl_name), cc.city, sum(c.sum_total) from \"Check\" c join Employee e on c.id_employee = e.id_employee join Customer_Card cc on c.card_number = cc.card_number where 1=1";
 
         if (!message[1].isBlank()) {
-            sql += "and e.empl_name=?";
-        }
+            //cc.city = ? AND e.empl_name = ? GROUP BY e.id_employee";
+            for (int i = 1; i < message.length; i++) {
+                String[] parts = message[i].split("&&&", -1);
+                String filter_part = parts[0];
 
-        if (!message[2].isBlank()) {
-            sql += "and e.empl_surname=?";
-        }
+                if (filter_part.contains("Name")) {
+                    filter_part = filter_part.replace(
+                        "Name",
+                        "(e.empl_surname || ' ' || e.empl_name)"
+                    );
+                } else if (filter_part.contains("City")) {
+                    filter_part = filter_part.replace("City", "cc.city");
+                } else if (filter_part.contains("Earnings")) {
+                    filter_part = filter_part.replace(
+                        "Earnings",
+                        "sum(c.sum_total)"
+                    );
+                }
 
-        if (!message[3].isBlank()) {
-            sql += "and cc.city=?";
+                sql += filter_part;
+            }
         }
 
         sql += " GROUP BY e.id_employee";
 
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
-            int i = 1;
-
             if (!message[1].isBlank()) {
-                ps.setString(i++, message[1]);
-            }
-
-            if (!message[2].isBlank()) {
-                ps.setString(i++, message[2]);
-            }
-
-            if (!message[3].isBlank()) {
-                ps.setString(i++, message[3]);
+                for (int i = 1; i < message.length; i++) {
+                    ps.setString(i, message[i].split("&&&", -1)[1]);
+                }
             }
 
             ResultSet rs = ps.executeQuery();
-            return formatResult(rs, "Surname", "Name", "City", "Earnings");
+
+            String forein_keys = "";
+            forein_keys +=
+                "City" + getAllEntriesForCol("Customer_Card", "city");
+            forein_keys +=
+                ":::Name" +
+                getAllEntriesForCol(
+                    "Employee",
+                    "(empl_surname ||' '|| empl_name)"
+                );
+
+            return formatResult(
+                rs,
+                3,
+                "Name&&&TEXT&&&notnull:::City&&&TEXT&&&nullable:::Earnings&&&REAL&&&notnull;;;" +
+                    forein_keys
+            );
         } catch (SQLException e) {
             throw new RuntimeException("Query 1 failed: " + e.getMessage());
         }
     }
 
-    private String specialQuery2() {
+    private String specialQuery2(String[] message) {
         String sql =
-            "SELECT DISTINCT cc.cust_surname || ' ' || cc.cust_name FROM Customer_Card cc WHERE cc.card_number IN ( SELECT c.card_number FROM \"Check\" c WHERE NOT EXISTS ( SELECT 1 FROM Employee e WHERE e.empl_role = 'Cashier' AND NOT EXISTS ( SELECT 1 FROM \"Check\" c2 WHERE c2.card_number = c.card_number AND c2.id_employee = e.id_employee)))";
+            "select distinct (cc.cust_surname || ' ' || cc.cust_name) from Customer_Card cc where cc.card_number in ( select c.card_number from \"Check\" c where not exists ( select 1 from Employee e where e.empl_role = 'Cashier' and not exists ( select 1 from \"Check\" c2 where c2.card_number = c.card_number and c2.id_employee = e.id_employee)))";
 
-        try (Statement stmt = connection.createStatement()) {
-            ResultSet rs = stmt.executeQuery(sql);
-            return formatResult(rs, "Customer Name");
+        if (!message[1].isBlank()) {
+            //cc.city = ? AND e.empl_name = ? GROUP BY e.id_employee";
+            for (int i = 1; i < message.length; i++) {
+                String[] parts = message[i].split("&&&", -1);
+                String filter_part = parts[0];
+
+                filter_part = filter_part.replace(
+                    "Customer Name",
+                    "(cc.cust_surname || ' ' || cc.cust_name)"
+                );
+
+                sql += filter_part;
+            }
+        }
+
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            if (!message[1].isBlank()) {
+                for (int i = 1; i < message.length; i++) {
+                    ps.setString(i, message[i].split("&&&", -1)[1]);
+                }
+            }
+
+            ResultSet rs = ps.executeQuery();
+
+            String forein_keys = "";
+            forein_keys +=
+                "Customer Name" +
+                getAllEntriesForCol(
+                    "Customer_Card",
+                    "(cust_surname || ' ' || cust_name)"
+                );
+
+            return formatResult(
+                rs,
+                1,
+                "Customer Name&&&TEXT&&&notnull;;;" + forein_keys
+            );
         } catch (SQLException e) {
             throw new RuntimeException("Query 2 failed: " + e.getMessage());
         }
     }
 
-    private String formatResult(ResultSet rs, String... columnNames)
+    private String getAllEntriesForCol(String table_name, String col)
         throws SQLException {
-        int cols = columnNames.length;
-        String result = "";
+        String sql = "select distinct " + col + " from \"" + table_name + "\"";
 
-        for (int i = 0; i < cols; i++) {
-            if (i > 0) result += ":::";
-            result += columnNames[i] + "&&&TEXT&&&null&&&null&&&null&&&notnull";
+        try (Statement stmt = connection.createStatement()) {
+            ResultSet rs = stmt.executeQuery(sql);
+            String result = ":::";
+
+            boolean first = true;
+            while (rs.next()) {
+                if (!first) result += "&&&";
+                result += rs.getString(1) + "%%%" + rs.getString(1);
+                first = false;
+            }
+
+            return result;
         }
+    }
 
-        result += ";;;";
-
+    private String formatResult(ResultSet rs, int cols, String sql)
+        throws SQLException {
         while (rs.next()) {
-            result += ";;;";
+            sql += ";;;";
+
             for (int i = 0; i < cols; i++) {
-                if (i > 0) result += ":::";
+                if (i > 0) sql += ":::";
                 Object val = rs.getObject(i + 1);
-                result += val == null ? "NULL" : val.toString();
+                sql += val == null ? "NULL" : val.toString();
             }
         }
 
-        return result;
+        return sql;
     }
 
     private boolean verifyPermissions(String empl_role, String table) {
