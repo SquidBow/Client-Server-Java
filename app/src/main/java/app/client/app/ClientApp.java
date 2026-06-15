@@ -144,7 +144,7 @@ public class ClientApp extends Application {
         });
 
         if (request_id == 1) {
-            request_message.message = "1;;;";
+            request_message.message = "1";
 
             top_bar = new HBox(
                 10,
@@ -159,7 +159,7 @@ public class ClientApp extends Application {
                 table_selector,
                 filter_button
             );
-            request_message.message = "2;;;";
+            request_message.message = "2";
         } else {
             //Unrechable
             top_bar = new HBox(10, new Label("Table:"), table_selector);
@@ -271,6 +271,14 @@ public class ClientApp extends Application {
     private void loadTable(String table_name, Message message) {
         new Thread(() -> {
             try {
+                System.out.println("\nSend request: ");
+                System.out.println("Table: " + table_name);
+                if (message != null) {
+                    System.out.println("Message: " + message.message);
+                } else {
+                    System.out.println("Message: null");
+                }
+
                 String responce_body = sendRequest(table_name, message);
 
                 System.out.println(
@@ -390,6 +398,29 @@ public class ClientApp extends Application {
         }
 
         return col_names;
+    }
+
+    private void parseFKeys(String key_string) {
+        forein_keys.clear();
+
+        if (key_string.length() == 0) return;
+
+        String[] key_parts = key_string.split(":::", -1);
+
+        for (int i = 0; i < key_parts.length; ) {
+            String column_name = key_parts[i++];
+            Map<String, String> value_pairs = new HashMap<>();
+
+            for (String value_str : key_parts[i++].split("&&&", -1)) {
+                if (value_str.equals("")) continue;
+
+                String[] value_parts = value_str.split("%%%", -1);
+
+                value_pairs.put(value_parts[0], value_parts[1]);
+            }
+
+            forein_keys.put(column_name, value_pairs);
+        }
     }
 
     private List<TableColumn<ObservableList<String>, String>> getColumnNamesRow(
@@ -741,18 +772,6 @@ public class ClientApp extends Application {
     }
 
     private void showFilterWindow(String table_name, Message query_message) {
-        Message message;
-
-        if (query_message == null) {
-            message = null;
-        } else {
-            message = new Message(
-                query_message.command_id,
-                query_message.user_id,
-                query_message.message
-            );
-        }
-
         Stage root = new Stage();
         VBox filter_view = new VBox(10);
 
@@ -901,7 +920,17 @@ public class ClientApp extends Application {
         apply_button.setOnAction(e -> {
             List<RequestFilter> filter_list = new ArrayList<>();
             boolean add_to_list = true;
-            // int index = 0;
+            Message message;
+
+            if (query_message == null) {
+                message = null;
+            } else {
+                message = new Message(
+                    query_message.command_id,
+                    query_message.user_id,
+                    query_message.message
+                );
+            }
 
             for (Node row : filter_view.getChildren()) {
                 if (row instanceof HBox) {
@@ -932,15 +961,28 @@ public class ClientApp extends Application {
                     }
 
                     if (message != null) {
-                        // Get type and then add smth to message based on that
+                        ColumnData col_data = getColData(filter.col);
 
-                        // String col_type = columns.get(filter.col);
-                        message.message +=
-                            DataBaseHelpers.createFilterStatementWord(
-                                filter.col,
-                                filter.val,
-                                true
-                            );
+                        if (
+                            col_data.type.equals("INTEGER") ||
+                            col_data.type.equals("REAL")
+                        ) {
+                            message.message +=
+                                ";;;" +
+                                DataBaseHelpers.createFilterStatementInteger(
+                                    filter.col,
+                                    filter.val,
+                                    filter.special
+                                );
+                        } else {
+                            message.message +=
+                                ";;;" +
+                                DataBaseHelpers.createFilterStatementWord(
+                                    filter.col,
+                                    filter.val,
+                                    true
+                                );
+                        }
                     }
 
                     filter_list.add(filter);
@@ -1086,29 +1128,6 @@ public class ClientApp extends Application {
             .get(2);
 
         return new RequestFilter(col_name, value, special_filed.getValue());
-    }
-
-    private void parseFKeys(String key_string) {
-        forein_keys.clear();
-
-        if (key_string.length() == 0) return;
-
-        String[] key_parts = key_string.split(":::", -1);
-
-        for (int i = 0; i < key_parts.length; ) {
-            String column_name = key_parts[i++];
-            Map<String, String> value_pairs = new HashMap<>();
-
-            for (String value_str : key_parts[i++].split("&&&", -1)) {
-                if (value_str.equals("")) continue;
-
-                String[] value_parts = value_str.split("%%%", -1);
-
-                value_pairs.put(value_parts[0], value_parts[1]);
-            }
-
-            forein_keys.put(column_name, value_pairs);
-        }
     }
 
     private String getKeyFromReplacement(String col_name, String replacement) {

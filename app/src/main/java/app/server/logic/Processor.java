@@ -29,10 +29,13 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                     process(context.data);
                 } catch (Exception e) {
                     System.err.println("Processing failed: " + e.getMessage());
+                    e.printStackTrace();
+
                     Message response = new Message();
                     response.command_id = context.data.command_id;
                     response.user_id = context.data.user_id;
                     response.message = "ERROR: " + e.getMessage();
+
                     try {
                         queueManager.encrypt_queue.put(
                             new NeworkPair<>(response, context.net_context)
@@ -62,7 +65,7 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                 message.message
         );
 
-        // Search is 1
+        // Select is 1
         if (message.command_id == 1) {
             DBContext db_context = createDBContext(message.message);
             responce.message = selectQuery(db_context);
@@ -290,44 +293,67 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         }
     }
 
-    private String specialQuery1(String[] message) {
-        for (String str : message) {
-            System.out.println("\nString: " + str);
-        }
-
+    private String specialQuery1(String[] params) {
         String sql =
             "select (e.empl_surname ||' '|| e.empl_name), cc.city, sum(c.sum_total) from \"Check\" c join Employee e on c.id_employee = e.id_employee join Customer_Card cc on c.card_number = cc.card_number where 1=1";
 
-        if (!message[1].isBlank()) {
+        String having = "";
+
+        if (params.length > 1) {
             //cc.city = ? AND e.empl_name = ? GROUP BY e.id_employee";
-            for (int i = 1; i < message.length; i++) {
-                String[] parts = message[i].split("&&&", -1);
+            for (int i = 1; i < params.length; i++) {
+                String[] parts = params[i].split("&&&", -1);
                 String filter_part = parts[0];
 
-                if (filter_part.contains("Name")) {
-                    filter_part = filter_part.replace(
-                        "Name",
-                        "(e.empl_surname || ' ' || e.empl_name)"
-                    );
-                } else if (filter_part.contains("City")) {
-                    filter_part = filter_part.replace("City", "cc.city");
-                } else if (filter_part.contains("Earnings")) {
-                    filter_part = filter_part.replace(
-                        "Earnings",
+                if (filter_part.contains("Earnings")) {
+                    having = filter_part.replace(
+                        "and Earnings",
                         "sum(c.sum_total)"
                     );
-                }
+                } else {
+                    if (filter_part.contains("Name")) {
+                        filter_part = filter_part.replace(
+                            "Name",
+                            "(e.empl_surname || ' ' || e.empl_name)"
+                        );
+                    } else if (filter_part.contains("City")) {
+                        filter_part = filter_part.replace("City", "cc.city");
+                    }
 
-                sql += filter_part;
+                    sql += filter_part;
+                }
             }
         }
 
-        sql += " GROUP BY e.id_employee";
+        sql += " group by e.id_employee";
+        if (!having.isBlank()) sql += " having" + having;
+
+        System.out.println("\nSQL: " + sql + "\n");
 
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
-            if (!message[1].isBlank()) {
-                for (int i = 1; i < message.length; i++) {
-                    ps.setString(i, message[i].split("&&&", -1)[1]);
+            if (params.length > 1) {
+                int ps_index = 1;
+
+                for (int i = 1; i < params.length; i++) {
+                    String[] parts = params[i].split("&&&", -1);
+
+                    if (!parts[0].contains("Earnings")) {
+                        ps.setString(ps_index++, parts[1]);
+                    }
+                }
+
+                if (!having.isBlank()) {
+                    for (int i = 1; i < params.length; i++) {
+                        String[] parts = params[i].split("&&&", -1);
+
+                        if (parts[0].contains("Earnings")) {
+                            ps.setDouble(
+                                ps_index++,
+                                Double.parseDouble(parts[1])
+                            );
+                            break;
+                        }
+                    }
                 }
             }
 
@@ -350,6 +376,7 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                     forein_keys
             );
         } catch (SQLException e) {
+            e.printStackTrace();
             throw new RuntimeException("Query 1 failed: " + e.getMessage());
         }
     }
@@ -358,7 +385,7 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         String sql =
             "select distinct (cc.cust_surname || ' ' || cc.cust_name) from Customer_Card cc where cc.card_number in ( select c.card_number from \"Check\" c where not exists ( select 1 from Employee e where e.empl_role = 'Cashier' and not exists ( select 1 from \"Check\" c2 where c2.card_number = c.card_number and c2.id_employee = e.id_employee)))";
 
-        if (!message[1].isBlank()) {
+        if (message.length > 1) {
             //cc.city = ? AND e.empl_name = ? GROUP BY e.id_employee";
             for (int i = 1; i < message.length; i++) {
                 String[] parts = message[i].split("&&&", -1);
@@ -374,7 +401,7 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         }
 
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
-            if (!message[1].isBlank()) {
+            if (message.length > 1) {
                 for (int i = 1; i < message.length; i++) {
                     ps.setString(i, message[i].split("&&&", -1)[1]);
                 }
@@ -396,6 +423,7 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                 "Customer Name&&&TEXT&&&notnull;;;" + forein_keys
             );
         } catch (SQLException e) {
+            e.printStackTrace();
             throw new RuntimeException("Query 2 failed: " + e.getMessage());
         }
     }
