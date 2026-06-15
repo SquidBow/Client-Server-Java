@@ -772,7 +772,23 @@ public class ClientApp extends Application {
 
                 cols.setValue(filter.col);
 
-                TextField filter_val = new TextField(filter.val);
+                Node filter_val;
+
+                if (forein_keys.containsKey(filter.col)) {
+                    ComboBox<String> values = new ComboBox<>(
+                        FXCollections.observableArrayList(
+                            forein_keys.get(filter.col).values()
+                        )
+                    );
+
+                    values.setValue(
+                        forein_keys.get(filter.col).get(filter.val)
+                    );
+
+                    filter_val = values;
+                } else {
+                    filter_val = new TextField(filter.val);
+                }
 
                 ComboBox<String> filter_special = new ComboBox<>(
                     FXCollections.observableArrayList(
@@ -809,7 +825,21 @@ public class ClientApp extends Application {
 
             cols.setValue(column_names[0]);
 
-            TextField val = new TextField();
+            // TextField val = new TextField();
+
+            Node filter_val;
+
+            if (forein_keys.containsKey(column_names[0])) {
+                ComboBox<String> values = new ComboBox<>(
+                    FXCollections.observableArrayList(
+                        forein_keys.get(column_names[0]).values()
+                    )
+                );
+
+                filter_val = values;
+            } else {
+                filter_val = new TextField();
+            }
 
             ComboBox<String> spec = new ComboBox<>(
                 FXCollections.observableArrayList(
@@ -819,9 +849,26 @@ public class ClientApp extends Application {
 
             spec.setValue(spec.getItems().get(0));
 
-            cols.valueProperty().addListener((obs, old, newCol) -> {
+            cols.valueProperty().addListener((obs, old, new_col) -> {
+                Node new_fitler_val;
+
+                if (forein_keys.containsKey(new_col)) {
+                    ComboBox<String> values = new ComboBox<>(
+                        FXCollections.observableArrayList(
+                            forein_keys.get(new_col).values()
+                        )
+                    );
+
+                    new_fitler_val = values;
+                } else {
+                    new_fitler_val = new TextField();
+                }
+
+                HBox row = (HBox) cols.getParent();
+                row.getChildren().set(1, new_fitler_val);
+
                 spec.getItems().setAll(
-                    getSpecialOptions(getColData(newCol).type)
+                    getSpecialOptions(getColData(new_col).type)
                 );
 
                 spec.setValue(spec.getItems().get(0));
@@ -829,7 +876,7 @@ public class ClientApp extends Application {
 
             Button delete_button = new Button("X");
 
-            HBox row = new HBox(10, cols, val, spec, delete_button);
+            HBox row = new HBox(10, cols, filter_val, spec, delete_button);
 
             delete_button.setOnAction(a -> {
                 filter_view.getChildren().remove(row);
@@ -856,11 +903,10 @@ public class ClientApp extends Application {
 
                     HBox hbox_row = (HBox) row;
 
-                    TextField text_field = (TextField) hbox_row
-                        .getChildren()
-                        .get(1);
+                    Node valueNode = hbox_row.getChildren().get(1);
 
                     if (
+                        valueNode instanceof TextField &&
                         !verifyAgainstType(
                             filter.val,
                             getColData(filter.col),
@@ -868,12 +914,13 @@ public class ClientApp extends Application {
                         )
                     ) {
                         add_to_list = false;
-
-                        text_field.setStyle(
+                        ((TextField) valueNode).setStyle(
                             "-fx-border-color: red; -fx-border-width: 1.5px;"
                         );
                     } else {
-                        text_field.setStyle("");
+                        if (valueNode instanceof TextField) (
+                            (TextField) valueNode
+                        ).setStyle("");
                     }
 
                     filter_list.add(filter);
@@ -1000,17 +1047,25 @@ public class ClientApp extends Application {
             .getChildren()
             .get(0);
 
-        TextField value_field = (TextField) row.getChildren().get(1);
+        String col_name = column_field.getValue();
+
+        Node value_field = row.getChildren().get(1);
+
+        String value;
+        if (value_field instanceof TextField) {
+            value = ((TextField) value_field).getText();
+        } else {
+            value = getKeyFromReplacement(
+                col_name,
+                ((ComboBox<String>) value_field).getValue()
+            );
+        }
 
         ComboBox<String> special_filed = (ComboBox<String>) row
             .getChildren()
             .get(2);
 
-        return new RequestFilter(
-            column_field.getValue(),
-            value_field.getText(),
-            special_filed.getValue()
-        );
+        return new RequestFilter(col_name, value, special_filed.getValue());
     }
 
     private void parseFKeys(String key_string) {
