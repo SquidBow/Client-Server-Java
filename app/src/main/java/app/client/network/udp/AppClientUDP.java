@@ -23,7 +23,6 @@ public class AppClientUDP implements IAppClient {
         try {
             this.address = InetAddress.getByName(host);
             socket = new DatagramSocket();
-            socket.setSoTimeout(1000);
         } catch (UnknownHostException | SocketException e) {
             e.printStackTrace();
         }
@@ -46,18 +45,20 @@ public class AppClientUDP implements IAppClient {
         int retries = 0;
         while (retries < 5) {
             socket.send(packet);
+            socket.setSoTimeout(1000);
 
             try {
                 socket.receive(ret);
+                break;
             } catch (SocketTimeoutException e) {
                 if (retries == 4) e.printStackTrace();
-
-                System.out.println(
-                    "\nUnable to send the request. Current retries: " + retries
-                );
-
-                retries++;
             }
+
+            System.out.println(
+                "\nDidn't get a responce. Current retries: " + retries
+            );
+
+            retries++;
         }
 
         if (retries == 5) return null;

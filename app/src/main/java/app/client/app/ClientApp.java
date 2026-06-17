@@ -86,6 +86,8 @@ public class ClientApp extends Application {
             return;
         }
 
+        if (client_info == null) return;
+
         showTablePage(primary_stage);
     }
 
@@ -823,7 +825,28 @@ public class ClientApp extends Application {
                         filter_special.setManaged(false);
                         filter_special.setVisible(false);
                     } else {
-                        filter_val = new TextField(filter.val[i]);
+                        TextField value_field = new TextField(filter.val[i]);
+
+                        String col_type = getColData(filter.col).type;
+                        if (col_type.equals("TEXT")) {
+                            value_field.setPromptText("Enter a text value.");
+                            value_field.setTooltip(
+                                new Tooltip(
+                                    "With \"Like\" you can use wildcards \"%\" to replace text"
+                                )
+                            );
+                        } else if (
+                            col_type.equals("INTEGER") ||
+                            col_type.equals("REAL")
+                        ) {
+                            value_field.setPromptText("Enter a number value");
+                        } else if (col_type.equals("DATE")) {
+                            value_field.setPromptText(
+                                "Enter a date in the format \"d.MM.yyyy\""
+                            );
+                        }
+
+                        filter_val = value_field;
                     }
 
                     filter_box = new HBox(
@@ -883,7 +906,27 @@ public class ClientApp extends Application {
                 spec.setManaged(false);
                 spec.setVisible(false);
             } else {
-                filter_val = new TextField();
+                TextField value_field = new TextField();
+
+                String col_type = getColData(column_names[0]).type;
+                if (col_type.equals("TEXT")) {
+                    value_field.setPromptText("Enter a text value.");
+                    value_field.setTooltip(
+                        new Tooltip(
+                            "With \"Like\" you can use wildcards \"%\" to replace text"
+                        )
+                    );
+                } else if (
+                    col_type.equals("INTEGER") || col_type.equals("REAL")
+                ) {
+                    value_field.setPromptText("Enter a number value");
+                } else if (col_type.equals("DATE")) {
+                    value_field.setPromptText(
+                        "Enter a date in the format \"d.MM.yyyy\""
+                    );
+                }
+
+                filter_val = value_field;
             }
 
             cols.valueProperty().addListener((obs, old, new_col) -> {
@@ -908,7 +951,24 @@ public class ClientApp extends Application {
                     spec.setManaged(false);
                     spec.setVisible(false);
                 } else {
-                    new_fitler_val = new TextField();
+                    TextField value_field = new TextField();
+
+                    String col_type = getColData(new_col).type;
+                    if (col_type.equals("TEXT")) {
+                        value_field.setPromptText(
+                            "Enter a text value. Use \"%\" for wildcards"
+                        );
+                    } else if (
+                        col_type.equals("INTEGER") || col_type.equals("REAL")
+                    ) {
+                        value_field.setPromptText("Enter a number value");
+                    } else if (col_type.equals("DATE")) {
+                        value_field.setPromptText(
+                            "Enter a date in the format \"d.MM.yyyy\""
+                        );
+                    }
+
+                    new_fitler_val = value_field;
 
                     spec.setManaged(true);
                     spec.setVisible(true);

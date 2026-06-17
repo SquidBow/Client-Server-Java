@@ -47,6 +47,7 @@ public class StoreServerUDP extends Thread {
                         Thread.sleep(10);
                         continue;
                     }
+
                     socket.send(
                         new DatagramPacket(
                             send.data,
@@ -56,6 +57,13 @@ public class StoreServerUDP extends Thread {
                             send.context.port
                         )
                     );
+
+                    // System.out.println(
+                    //     "Sent response to " +
+                    //         send.context.address +
+                    //         ":" +
+                    //         send.context.port
+                    // );
                 } catch (InterruptedException | IOException e) {
                     e.printStackTrace();
                 }

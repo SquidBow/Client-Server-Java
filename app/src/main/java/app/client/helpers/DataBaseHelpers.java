@@ -82,7 +82,7 @@ public class DataBaseHelpers {
         String sql = " and (";
 
         for (int i = 0; i < val.length; i++) {
-            if (i > 0) sql += " OR ";
+            if (i > 0) sql += " and ";
             if (val[i].equals("NULL")) {
                 sql += column + " is null";
             } else {
@@ -112,7 +112,7 @@ public class DataBaseHelpers {
         String sql = " and (";
 
         for (int i = 0; i < val.length; i++) {
-            if (i > 0) sql += " OR ";
+            if (i > 0) sql += " and ";
             if (val[i].equals("NULL")) {
                 sql += column + " is null";
             } else if (mode[i].equals("Start")) {

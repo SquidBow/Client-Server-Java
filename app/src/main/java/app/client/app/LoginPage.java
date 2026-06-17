@@ -67,7 +67,9 @@ public class LoginPage {
 
         Message responce = app_client.sendRequest(request);
 
-        if (responce.message.equals("Failed auth")) return null;
+        if (
+            responce == null || responce.message.equals("Failed auth")
+        ) return null;
 
         return new ClientInfo(
             Integer.parseInt(responce.message.split("%%%")[0]),
