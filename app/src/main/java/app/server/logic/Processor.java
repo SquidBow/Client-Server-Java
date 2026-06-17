@@ -661,17 +661,18 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         // col:::val1&&&val2:::col2:::valu1&&&val2:::...
 
         while (rs.next()) {
-            keys +=
-                ":::" +
-                getKeyReplace(rs.getString("table"), rs.getString("from"));
-
-            // System.out.println(
-            //     rs.getString("from") +
-            //         " -> " +
-            //         rs.getString("to") +
-            //         " at " +
-            //         rs.getString("table")
-            // );
+            if (!rs.getString("table").equals(table_name)) {
+                keys +=
+                    ":::" +
+                    getKeyReplace(rs.getString("table"), rs.getString("from"));
+                System.out.println(
+                    rs.getString("from") +
+                        " -> " +
+                        rs.getString("to") +
+                        " at " +
+                        rs.getString("table")
+                );
+            }
         }
 
         if (keys.length() == 0) return "";
