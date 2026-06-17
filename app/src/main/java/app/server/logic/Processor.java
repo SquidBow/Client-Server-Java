@@ -58,7 +58,7 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         responce.message = "Unknown command id";
 
         System.out.println(
-            "Processing message:\nCommand_id: " +
+            "\nProcessing message:\nCommand_id: " +
                 message.command_id +
                 "\nUser_id: " +
                 message.user_id +
@@ -198,14 +198,14 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                 )
             )
         ) {
-            System.out.println(
-                "\nUpdate query: " +
-                    createUpdateStatement(
-                        object_context.table,
-                        object_context.object
-                    ) +
-                    "\n"
-            );
+            // System.out.println(
+            //     "\nUpdate query: " +
+            //         createUpdateStatement(
+            //             object_context.table,
+            //             object_context.object
+            //         ) +
+            //         "\n"
+            // );
 
             int i = 0;
 
@@ -254,37 +254,37 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                 )
             )
         ) {
-            System.out.println(
-                "\nInser query: " +
-                    createInsertStatement(
-                        object_context.table,
-                        object_context.object
-                    ) +
-                    "\n"
-            );
-            System.out.println(
-                "Param count: " + ps.getParameterMetaData().getParameterCount()
-            );
+            // System.out.println(
+            //     "\nInser query: " +
+            //         createInsertStatement(
+            //             object_context.table,
+            //             object_context.object
+            //         ) +
+            //         "\n"
+            // );
+            // System.out.println(
+            //     "Param count: " + ps.getParameterMetaData().getParameterCount()
+            // );
 
-            System.out.println(
-                "Map size: " + object_context.object.getMap().size()
-            );
+            // System.out.println(
+            //     "Map size: " + object_context.object.getMap().size()
+            // );
 
             int i = 0;
 
             for (Object val : object_context.object.getMap().values()) {
                 if (val.toString().equals("NULL")) {
-                    System.out.println("\nNULL\n");
+                    // System.out.println("\nNULL\n");
                     ps.setNull(++i, Types.NULL);
                 } else if (
                     getKeyFromVal(val, object_context.object.getMap()).equals(
                         "password"
                     )
                 ) {
-                    System.out.println("\nPassword\n");
+                    // System.out.println("\nPassword\n");
                     ps.setString(++i, Functions.hashPassword(val.toString()));
                 } else {
-                    System.out.println("\nElse\n");
+                    // System.out.println("\nElse\n");
                     ps.setObject(++i, val);
                 }
             }
@@ -342,8 +342,13 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
     }
 
     private String specialQuery1(String[] params) {
-        String sql =
-            "select (e.empl_surname ||' '|| e.empl_name), cc.city, sum(c.sum_total) from \"Check\" c join Employee e on c.id_employee = e.id_employee join Customer_Card cc on c.card_number = cc.card_number where 1=1";
+        String sql = """
+            select (e.empl_surname ||' '|| e.empl_name), cc.city, sum(c.sum_total)
+            from \"Check\" c
+            join Employee e on c.id_employee = e.id_employee
+            join Customer_Card cc on c.card_number = cc.card_number
+            where 1=1
+            """;
 
         String having = " 1=1";
 
@@ -373,10 +378,10 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
             }
         }
 
-        sql += " group by e.id_employee";
+        sql += " group by e.id_employee, cc.city";
         if (!having.equals("1=1")) sql += " having" + having;
 
-        System.out.println("\nSQL: " + sql + "\n");
+        // System.out.println("\nSQL: " + sql + "\n");
 
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             if (params.length > 1) {
@@ -435,8 +440,21 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
     }
 
     private String specialQuery2(String[] message) {
-        String sql =
-            "select distinct (cc.cust_surname || ' ' || cc.cust_name) from Customer_Card cc where cc.card_number in ( select c.card_number from \"Check\" c where not exists ( select 1 from Employee e where e.empl_role = 'Cashier' and not exists ( select 1 from \"Check\" c2 where c2.card_number = c.card_number and c2.id_employee = e.id_employee)))";
+        String sql = """
+            select distinct (cc.cust_surname || ' ' || cc.cust_name)
+            from Customer_Card cc
+            where cc.card_number in (
+                select c.card_number
+                from \"Check\" c
+                where not exists (
+                    select 1 from Employee e
+                    where e.empl_role = 'Cashier' and not exists (
+                        select 1 from \"Check\" c2
+                        where c2.card_number = c.card_number and c2.id_employee = e.id_employee
+                    )
+                )
+            )
+            """;
 
         if (message.length > 1) {
             //cc.city = ? AND e.empl_name = ? GROUP BY e.id_employee";
@@ -647,13 +665,13 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                 ":::" +
                 getKeyReplace(rs.getString("table"), rs.getString("from"));
 
-            System.out.println(
-                rs.getString("from") +
-                    " -> " +
-                    rs.getString("to") +
-                    " at " +
-                    rs.getString("table")
-            );
+            // System.out.println(
+            //     rs.getString("from") +
+            //         " -> " +
+            //         rs.getString("to") +
+            //         " at " +
+            //         rs.getString("table")
+            // );
         }
 
         if (keys.length() == 0) return "";

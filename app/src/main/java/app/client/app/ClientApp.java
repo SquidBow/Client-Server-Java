@@ -60,7 +60,7 @@ public class ClientApp extends Application {
     private Map<String, Map<String, String>> forein_keys = new HashMap<>();
     IAppClient app_client;
 
-    private boolean DEBUG = true;
+    private boolean DEBUG = false;
 
     @Override
     public void start(Stage primary_stage) {
@@ -114,6 +114,8 @@ public class ClientApp extends Application {
         root.setCenter(table_view);
 
         table_selector.valueProperty().addListener((obs, old_val, new_val) -> {
+            load_table = new_val;
+
             HBox new_top_bar;
 
             if (new_val.startsWith("(Special)")) {
@@ -124,8 +126,6 @@ public class ClientApp extends Application {
 
             new_top_bar.setPadding(new Insets(10));
             root.setTop(new_top_bar);
-
-            load_table = new_val;
         });
 
         primary_stage.setScene(new Scene(root, 900, 600));
@@ -182,9 +182,9 @@ public class ClientApp extends Application {
 
         if (
             client_info.role.equals("Manager") ||
-            load_table.equals("Sale") ||
-            load_table.equals("Check") ||
-            load_table.equals("Customer_Card")
+            table_selector.getValue().equals("Sale") ||
+            table_selector.getValue().equals("Check") ||
+            table_selector.getValue().equals("Customer_Card")
         ) {
             Button insert_button = new Button("Insert entry");
 
