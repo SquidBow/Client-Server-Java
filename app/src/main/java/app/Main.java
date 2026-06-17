@@ -1,16 +1,19 @@
 package app;
 
+import static app.generic.helpers.Globals.*;
+
 import app.generic.logic.Decryptor;
 import app.generic.logic.Encryptor;
 import app.server.logic.*;
 import app.server.network.tcp.StoreServerTCP;
+import app.server.network.udp.StoreServerUDP;
 import java.util.ArrayList;
 import java.util.List;
 
 public class Main {
 
     public static void main(String[] args) {
-        QueueManager queueManager = new QueueManager();
+        QueueManager queue_manager = new QueueManager();
 
         // int numReceivers = 2;
         int numDecryptors = 2;
@@ -19,18 +22,22 @@ public class Main {
 
         List<Thread> threads = new ArrayList<>();
 
-        new StoreServerTCP(queueManager, 8080);
+        if (network_implementation.equals("udp")) {
+            new StoreServerUDP(queue_manager, port);
+        } else {
+            new StoreServerTCP(queue_manager, port);
+        }
 
         // for (int i = 0; i < numReceivers; i++) threads.add(
         // );
         for (int i = 0; i < numDecryptors; i++) threads.add(
-            new Thread(new Decryptor(queueManager))
+            new Thread(new Decryptor(queue_manager))
         );
         for (int i = 0; i < numProcessors; i++) threads.add(
-            new Thread(new Processor(queueManager, "storage.db"))
+            new Thread(new Processor(queue_manager, "storage.db"))
         );
         for (int i = 0; i < numEncryptors; i++) threads.add(
-            new Thread(new Encryptor(queueManager))
+            new Thread(new Encryptor(queue_manager))
         );
 
         for (Thread thread : threads) {

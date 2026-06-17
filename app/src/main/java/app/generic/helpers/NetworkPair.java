@@ -1,11 +1,11 @@
 package app.generic.helpers;
 
-public class NeworkPair<T> {
+public class NetworkPair<T> {
 
     public final T data;
     public final NetContext context;
 
-    public NeworkPair(T data, NetContext context) {
+    public NetworkPair(T data, NetContext context) {
         this.data = data;
         this.context = context;
     }

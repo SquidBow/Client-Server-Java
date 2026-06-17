@@ -5,6 +5,7 @@ import static app.server.database.DataBaseManager.*;
 import app.generic.helpers.*;
 import app.generic.objects.GenericObject;
 import app.server.database.DataBaseManager;
+import app.server.helpers.Functions;
 import java.sql.*;
 import java.util.HashMap;
 import java.util.Map;
@@ -38,7 +39,7 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
 
                     try {
                         queueManager.encrypt_queue.put(
-                            new NeworkPair<>(response, context.net_context)
+                            new NetworkPair<>(response, context.net_context)
                         );
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
@@ -122,17 +123,19 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                 createSelectStatement(db_context)
             )
         ) {
-            int i = 1;
+            int paramter_index = 1;
 
             for (String filter : db_context.filters) {
                 String[] parts = filter.split("&&&");
                 if (!parts[0].endsWith("is null")) {
-                    ps.setObject(i++, parts[1]);
+                    for (int i = 1; i < parts.length; i++) {
+                        ps.setObject(paramter_index++, parts[i]);
+                    }
                 }
             }
 
-            ps.setObject(i++, db_context.limit);
-            ps.setObject(i++, db_context.offset);
+            ps.setObject(paramter_index++, db_context.limit);
+            ps.setObject(paramter_index++, db_context.offset);
 
             ResultSet rs = ps.executeQuery();
 
@@ -195,6 +198,15 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                 )
             )
         ) {
+            System.out.println(
+                "\nUpdate query: " +
+                    createUpdateStatement(
+                        object_context.table,
+                        object_context.object
+                    ) +
+                    "\n"
+            );
+
             int i = 0;
 
             for (Map.Entry<String, Object> entry : object_context.object
@@ -242,12 +254,37 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                 )
             )
         ) {
+            System.out.println(
+                "\nInser query: " +
+                    createInsertStatement(
+                        object_context.table,
+                        object_context.object
+                    ) +
+                    "\n"
+            );
+            System.out.println(
+                "Param count: " + ps.getParameterMetaData().getParameterCount()
+            );
+
+            System.out.println(
+                "Map size: " + object_context.object.getMap().size()
+            );
+
             int i = 0;
 
             for (Object val : object_context.object.getMap().values()) {
                 if (val.toString().equals("NULL")) {
+                    System.out.println("\nNULL\n");
                     ps.setNull(++i, Types.NULL);
+                } else if (
+                    getKeyFromVal(val, object_context.object.getMap()).equals(
+                        "password"
+                    )
+                ) {
+                    System.out.println("\nPassword\n");
+                    ps.setString(++i, Functions.hashPassword(val.toString()));
                 } else {
+                    System.out.println("\nElse\n");
                     ps.setObject(++i, val);
                 }
             }
@@ -263,6 +300,14 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         }
     }
 
+    private String getKeyFromVal(Object val, Map<String, Object> pairs) {
+        for (Map.Entry<String, Object> entry : pairs.entrySet()) {
+            if (entry.getValue().equals(val)) return entry.getKey();
+        }
+
+        return "NULL";
+    }
+
     private String deleteQuery(DBObjectContext object_context) {
         if (!verifyPermissions(context.user_role, object_context.table)) {
             return "Operation not permitted";
@@ -272,14 +317,17 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
             PreparedStatement ps = connection.prepareStatement(
                 createDeleteStatement(
                     object_context.table,
-                    object_context.object.getPrimaryKeys()
+                    object_context.object
                 )
             )
         ) {
             int i = 0;
 
             for (String key : object_context.object.getPrimaryKeys()) {
-                ps.setObject(++i, object_context.object.getMap().get(key));
+                //Skip setting nulls
+                if (!object_context.object.getMap().get(key).equals("NULL")) {
+                    ps.setObject(++i, object_context.object.getMap().get(key));
+                }
             }
 
             int rows = ps.executeUpdate();
@@ -297,7 +345,7 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         String sql =
             "select (e.empl_surname ||' '|| e.empl_name), cc.city, sum(c.sum_total) from \"Check\" c join Employee e on c.id_employee = e.id_employee join Customer_Card cc on c.card_number = cc.card_number where 1=1";
 
-        String having = "";
+        String having = " 1=1";
 
         if (params.length > 1) {
             //cc.city = ? AND e.empl_name = ? GROUP BY e.id_employee";
@@ -306,8 +354,8 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                 String filter_part = parts[0];
 
                 if (filter_part.contains("Earnings")) {
-                    having = filter_part.replace(
-                        "and Earnings",
+                    having += filter_part.replace(
+                        "Earnings",
                         "sum(c.sum_total)"
                     );
                 } else {
@@ -326,7 +374,7 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         }
 
         sql += " group by e.id_employee";
-        if (!having.isBlank()) sql += " having" + having;
+        if (!having.equals("1=1")) sql += " having" + having;
 
         System.out.println("\nSQL: " + sql + "\n");
 
@@ -338,19 +386,24 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                     String[] parts = params[i].split("&&&", -1);
 
                     if (!parts[0].contains("Earnings")) {
-                        ps.setString(ps_index++, parts[1]);
+                        for (int j = 1; j < parts.length; j++) {
+                            ps.setString(ps_index++, parts[j]);
+                        }
                     }
                 }
 
-                if (!having.isBlank()) {
+                if (!having.equals("1=1")) {
                     for (int i = 1; i < params.length; i++) {
                         String[] parts = params[i].split("&&&", -1);
 
                         if (parts[0].contains("Earnings")) {
-                            ps.setDouble(
-                                ps_index++,
-                                Double.parseDouble(parts[1])
-                            );
+                            for (int j = 1; j < parts.length; j++) {
+                                ps.setDouble(
+                                    ps_index++,
+                                    Double.parseDouble(parts[j])
+                                );
+                            }
+
                             break;
                         }
                     }
@@ -401,9 +454,13 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         }
 
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            int ps_index = 1;
+
             if (message.length > 1) {
-                for (int i = 1; i < message.length; i++) {
-                    ps.setString(i, message[i].split("&&&", -1)[1]);
+                String[] parts = message[1].split("&&&", -1);
+
+                for (int i = 1; i < parts.length; i++) {
+                    ps.setString(ps_index++, parts[i]);
                 }
             }
 
@@ -474,7 +531,7 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
     private void sendMessage(Message message) {
         try {
             queueManager.encrypt_queue.put(
-                new NeworkPair<Message>(message, context.net_context)
+                new NetworkPair<Message>(message, context.net_context)
             );
 
             return;
@@ -539,14 +596,18 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
         );
     }
 
-    public String handleLogin(String credentials) {
+    public String handleLogin(String name, String password) {
         try (
             PreparedStatement ps = connection.prepareStatement(
                 "select id_employee, empl_role from Employee where (empl_surname || ' ' || empl_name) = ? and password = ?"
             )
         ) {
-            ps.setString(1, credentials.split("%%%")[0]);
-            ps.setString(2, credentials.split("%%%")[1]);
+            if (name.isBlank() || password.isBlank()) {
+                return "Failed auth";
+            }
+
+            ps.setString(1, name);
+            ps.setString(2, password);
 
             ResultSet rs = ps.executeQuery();
 
@@ -560,7 +621,7 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                 return "Failed auth";
             }
         } catch (SQLException e) {
-            throw new RuntimeException("Failed Auth: " + e.getMessage());
+            throw new RuntimeException("DataBase unavaible: " + e.getMessage());
         }
     }
 

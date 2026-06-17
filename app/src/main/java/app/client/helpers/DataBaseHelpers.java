@@ -43,52 +43,97 @@ public class DataBaseHelpers {
     // the use later
     public static String createFilterStatementWord(
         String column,
-        String word,
-        boolean exact
+        String[] word,
+        String[] mode
     ) {
-        String sql = " and " + column;
+        String sql = " and (";
 
-        if (word.equals("NULL")) {
-            return sql + " is null&&&";
+        for (int i = 0; i < word.length; i++) {
+            if (i > 0) sql += " OR ";
+            if (word[i].equals("NULL")) {
+                sql += column + " is null";
+            } else if (mode[i].equals("Exact")) {
+                sql += column + " = ?";
+            } else {
+                sql += column + " like ?";
+            }
         }
 
-        if (exact) {
-            sql += " = ?";
+        sql += ")&&&";
 
-            return sql + "&&&" + word;
-        } else {
-            sql += " like ?";
-
-            return sql + "&&&%" + word + "%";
+        for (int i = 0; i < word.length; i++) {
+            if (i > 0) sql += "&&&";
+            if (word[i].equals("NULL")) {
+            } else if (mode[i].equals("Exact")) {
+                sql += word[i];
+            } else {
+                sql += word[i];
+            }
         }
+
+        return sql;
     }
 
     public static String createFilterStatementInteger(
         String column,
-        String val,
-        String mode
+        String[] val,
+        String[] mode
     ) {
-        String sql = " and " + column;
+        String sql = " and (";
 
-        sql += " " + mode + " ?";
+        for (int i = 0; i < val.length; i++) {
+            if (i > 0) sql += " OR ";
+            if (val[i].equals("NULL")) {
+                sql += column + " is null";
+            } else {
+                sql += column + " " + mode[i] + " ?";
+            }
+        }
 
-        return sql + "&&&" + val;
+        sql += ")&&&";
+
+        for (int i = 0; i < val.length; i++) {
+            if (i > 0) sql += "&&&";
+
+            if (!val[i].equals("NULL")) {
+                sql += val[i];
+            }
+        }
+
+        return sql;
     }
 
     //So it doesn't habe to translate into int and back to string
     public static String createFilterStatementDate(
         String column,
-        String val,
-        String mode
+        String[] val,
+        String[] mode
     ) {
-        String sql = " and " + column;
+        String sql = " and (";
 
-        if (mode.equals("Start")) {
-            sql += " >= ?";
-        } else {
-            sql += " <= ?";
+        for (int i = 0; i < val.length; i++) {
+            if (i > 0) sql += " OR ";
+            if (val[i].equals("NULL")) {
+                sql += column + " is null";
+            } else if (mode[i].equals("Start")) {
+                sql += column + " >= ?";
+            } else {
+                sql += column + " <= ?";
+            }
         }
 
-        return sql + "&&&" + val;
+        sql += ")&&&";
+
+        for (int i = 0; i < val.length; i++) {
+            if (i > 0) sql += "&&&";
+            if (val[i].equals("NULL")) {
+            } else if (mode[i].equals("Start")) {
+                sql += val[i];
+            } else {
+                sql += val[i];
+            }
+        }
+
+        return sql;
     }
 }

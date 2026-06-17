@@ -1,12 +1,14 @@
 package app.client.app;
 
-import static app.client.helpers.Functions.*;
+import static app.generic.helpers.Globals.*;
 
 import app.client.helpers.ClientInfo;
 import app.client.helpers.ColumnData;
 import app.client.helpers.DataBaseHelpers;
 import app.client.helpers.RequestFilter;
-import app.client.network.tcp.ActualClient;
+import app.client.interfaces.IAppClient;
+import app.client.network.tcp.AppClientTCP;
+import app.client.network.udp.AppClientUDP;
 import app.generic.helpers.*;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -55,31 +57,29 @@ public class ClientApp extends Application {
     private Map<String, List<RequestFilter>> filters = new HashMap<>();
     private TableView<ObservableList<String>> table_view = new TableView<>();
 
-    // Map<table, Map<col, values>> <- NOT THIS
-    // We already know the table cause it is for this table
-    // So Map<col, values> <- NOT THIS
-    // Cause I need to save the real id and display to replace when updating/inserting/deleting
-    // So Map<col, Map<real, display>>
     private Map<String, Map<String, String>> forein_keys = new HashMap<>();
-
-    ActualClient actual_client;
+    IAppClient app_client;
 
     private boolean DEBUG = true;
 
     @Override
     public void start(Stage primary_stage) {
         try {
-            actual_client = new ActualClient("localhost", 8080);
+            if (network_implementation.equals("udp")) {
+                app_client = new AppClientUDP(host, port);
+            } else {
+                app_client = new AppClientTCP(host, port);
+            }
 
             if (DEBUG) {
                 client_info = LoginPage.sendRequest(
-                    actual_client,
+                    app_client,
                     "Admin",
                     "Admin",
                     "admin"
                 );
             } else {
-                client_info = LoginPage.showLoginPage(actual_client);
+                client_info = LoginPage.showLoginPage(app_client);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -217,12 +217,14 @@ public class ClientApp extends Application {
                 );
 
                 try {
-                    actual_client.sendRequest(
+                    app_client.sendRequest(
                         new Message(4, client_info.id, delete_message)
                     );
                 } catch (Exception ex) {
                     ex.printStackTrace();
                 }
+
+                loadTable(table_selector.getValue(), null);
             });
 
             //Update button
@@ -340,19 +342,19 @@ public class ClientApp extends Application {
         if (message != null) {
             // System.out.println("\n\n\nMessage is not null\n\n\n");
             // System.out.println("\n\n\nRequest: " + message.message + "\n\n\n");
-            return actual_client.sendRequest(message).message;
+            return app_client.sendRequest(message).message;
         }
         // else if (table_name.startsWith("(Special)")) {
         //     // System.out.println("\n\n\nMessage is null\n\n\n");
         //     String request_id = special_queries.get(table_name);
-        //     return actual_client
+        //     return app_client
         //         .sendRequest(new Message(5, client_info.id, request_id))
         //         .message;
         // }
         else {
             String[] table_filters = getFiltersForTable(table_name);
 
-            return actual_client
+            return app_client
                 .sendRequest(
                     new Message(
                         1,
@@ -537,6 +539,10 @@ public class ClientApp extends Application {
                     ) col_data.type = "INTEGER";
                 }
 
+                if (col_value.getText().equals("")) {
+                    col_value.setText("NULL");
+                }
+
                 if (!verifyAgainstType(col_value.getText(), col_data, true)) {
                     send_request = false;
 
@@ -561,7 +567,8 @@ public class ClientApp extends Application {
 
                 col_values.set(
                     col_values.size() - 1,
-                    hashPassword(col_values.getLast())
+                    // hashPassword(col_values.getLast())
+                    col_values.getLast()
                 );
             } else {
                 all_col_names = column_names;
@@ -575,7 +582,7 @@ public class ClientApp extends Application {
                     col_values.toArray(new String[0])
                 );
                 try {
-                    Message responce = actual_client.sendRequest(
+                    Message responce = app_client.sendRequest(
                         new Message(3, client_info.id, message)
                     );
 
@@ -701,7 +708,7 @@ public class ClientApp extends Application {
                     col_values.toArray(new String[0])
                 );
                 try {
-                    Message responce = actual_client.sendRequest(
+                    Message responce = app_client.sendRequest(
                         new Message(2, client_info.id, message)
                     );
 
@@ -741,7 +748,7 @@ public class ClientApp extends Application {
                 filter_string = DataBaseHelpers.createFilterStatementWord(
                     filter.col,
                     filter.val,
-                    true
+                    new String[] { "Exact" }
                 );
             } else if (
                 col_data.type.equals("INTEGER") || col_data.type.equals("REAL")
@@ -761,7 +768,7 @@ public class ClientApp extends Application {
                 filter_string = DataBaseHelpers.createFilterStatementWord(
                     filter.col,
                     filter.val,
-                    filter.special.equals("Exact")
+                    filter.special
                 );
             }
 
@@ -771,6 +778,7 @@ public class ClientApp extends Application {
         return all_filters.toArray(new String[0]);
     }
 
+    @SuppressWarnings("unchecked")
     private void showFilterWindow(String table_name, Message query_message) {
         Stage root = new Stage();
         VBox filter_view = new VBox(10);
@@ -779,57 +787,59 @@ public class ClientApp extends Application {
 
         if (table_filters != null) {
             for (RequestFilter filter : table_filters) {
-                ComboBox<String> cols = new ComboBox<>(
-                    FXCollections.observableArrayList(column_names)
-                );
+                for (int i = 0; i < filter.val.length; i++) {
+                    ComboBox<String> cols = new ComboBox<>(
+                        FXCollections.observableArrayList(column_names)
+                    );
 
-                cols.setValue(filter.col);
+                    cols.setValue(filter.col);
 
-                Node filter_val;
-                HBox filter_box;
+                    Node filter_val;
+                    HBox filter_box;
 
-                Button delete_button = new Button("X");
+                    Button delete_button = new Button("X");
 
-                ComboBox<String> filter_special = new ComboBox<>(
-                    FXCollections.observableArrayList(
-                        getSpecialOptions(getColData(filter.col).type)
-                    )
-                );
-
-                filter_special.setValue(filter.special);
-
-                if (forein_keys.containsKey(filter.col)) {
-                    ComboBox<String> values = new ComboBox<>(
+                    ComboBox<String> filter_special = new ComboBox<>(
                         FXCollections.observableArrayList(
-                            forein_keys.get(filter.col).values()
+                            getSpecialOptions(getColData(filter.col).type)
                         )
                     );
 
-                    values.setValue(
-                        forein_keys.get(filter.col).get(filter.val)
+                    filter_special.setValue(filter.special[i]);
+
+                    if (forein_keys.containsKey(filter.col)) {
+                        ComboBox<String> values = new ComboBox<>(
+                            FXCollections.observableArrayList(
+                                forein_keys.get(filter.col).values()
+                            )
+                        );
+
+                        values.setValue(
+                            forein_keys.get(filter.col).get(filter.val[i])
+                        );
+
+                        filter_val = values;
+
+                        filter_special.setManaged(false);
+                        filter_special.setVisible(false);
+                    } else {
+                        filter_val = new TextField(filter.val[i]);
+                    }
+
+                    filter_box = new HBox(
+                        10,
+                        cols,
+                        filter_val,
+                        filter_special,
+                        delete_button
                     );
 
-                    filter_val = values;
+                    delete_button.setOnAction(e -> {
+                        filter_view.getChildren().remove(filter_box);
+                    });
 
-                    filter_special.setManaged(false);
-                    filter_special.setVisible(false);
-                } else {
-                    filter_val = new TextField(filter.val);
+                    filter_view.getChildren().add(filter_box);
                 }
-
-                filter_box = new HBox(
-                    10,
-                    cols,
-                    filter_val,
-                    filter_special,
-                    delete_button
-                );
-
-                delete_button.setOnAction(e -> {
-                    filter_view.getChildren().remove(filter_box);
-                });
-
-                filter_view.getChildren().add(filter_box);
             }
         }
 
@@ -861,6 +871,13 @@ public class ClientApp extends Application {
                     )
                 );
 
+                if (values.getItems().size() > 0) {
+                    values.setValue(values.getItems().get(0));
+                }
+                // else {
+                //     values.setValue("No entries avaible");
+                // }
+
                 filter_val = values;
 
                 spec.setManaged(false);
@@ -878,6 +895,13 @@ public class ClientApp extends Application {
                             forein_keys.get(new_col).values()
                         )
                     );
+
+                    if (values.getItems().size() > 0) {
+                        values.setValue(values.getItems().get(0));
+                    }
+                    // else {
+                    //     values.setValue("No entries avaible");
+                    // }
 
                     new_fitler_val = values;
 
@@ -918,8 +942,6 @@ public class ClientApp extends Application {
         Button apply_button = new Button("Apply the changes");
 
         apply_button.setOnAction(e -> {
-            List<RequestFilter> filter_list = new ArrayList<>();
-            boolean add_to_list = true;
             Message message;
 
             if (query_message == null) {
@@ -932,35 +954,102 @@ public class ClientApp extends Application {
                 );
             }
 
+            List<RequestFilter> filter_list = new ArrayList<>();
+            boolean add_to_list = true;
+
+            Map<String, List<String>> vals_per_col = new HashMap<>();
+            Map<String, List<String>> specs_per_col = new HashMap<>();
+
             for (Node row : filter_view.getChildren()) {
-                if (row instanceof HBox) {
-                    // Add row to the filter
+                if (!(row instanceof HBox)) continue;
 
-                    RequestFilter filter = nodeToFilter(row);
+                HBox hbox_row = (HBox) row;
 
-                    HBox hbox_row = (HBox) row;
+                //Node to filter
+                ComboBox<String> column_field = (ComboBox<String>) hbox_row
+                    .getChildren()
+                    .get(0);
 
-                    Node valueNode = hbox_row.getChildren().get(1);
+                String col_name = column_field.getValue();
 
-                    if (
-                        valueNode instanceof TextField &&
-                        !verifyAgainstType(
-                            filter.val,
-                            getColData(filter.col),
-                            false
-                        )
-                    ) {
-                        add_to_list = false;
-                        ((TextField) valueNode).setStyle(
+                Node value_field = hbox_row.getChildren().get(1);
+
+                String value;
+                if (value_field instanceof TextField) {
+                    value = ((TextField) value_field).getText();
+                } else {
+                    value = getKeyFromReplacement(
+                        col_name,
+                        ((ComboBox<String>) value_field).getValue()
+                    );
+                }
+
+                String special = (
+                    (ComboBox<String>) hbox_row.getChildren().get(2)
+                ).getValue();
+                //
+
+                Node value_node = hbox_row.getChildren().get(1);
+
+                if (!verifyAgainstType(value, getColData(col_name), false)) {
+                    add_to_list = false;
+
+                    if (value_node instanceof TextField) {
+                        ((TextField) value_node).setStyle(
                             "-fx-border-color: red; -fx-border-width: 1.5px;"
                         );
-                    } else {
-                        if (valueNode instanceof TextField) (
-                            (TextField) valueNode
-                        ).setStyle("");
                     }
+                    if (value_node instanceof ComboBox) {
+                        ((ComboBox<String>) value_node).setStyle(
+                            "-fx-border-color: red; -fx-border-width: 1.5px;"
+                        );
+                    }
+                }
+                // else {
+                //     if (valueNode instanceof TextField) (
+                //         (TextField) valueNode
+                //     ).setStyle("");
+                // }
 
-                    if (message != null) {
+                vals_per_col
+                    .computeIfAbsent(col_name, c -> new ArrayList<>())
+                    .add(value);
+
+                specs_per_col
+                    .computeIfAbsent(col_name, c -> new ArrayList<>())
+                    .add(special);
+
+                // if (message != null) {
+                //     ColumnData col_data = getColData(col_name);
+
+                //     if (
+                //         col_data.type.equals("INTEGER") ||
+                //         col_data.type.equals("REAL")
+                //     ) {
+                //         message.message +=
+                //             ";;;" +
+                //             DataBaseHelpers.createFilterStatementInteger(
+                //                 filter.col,
+                //                 filter.val,
+                //                 filter.special
+                //             );
+                //     } else {
+                //         message.message +=
+                //             ";;;" +
+                //             DataBaseHelpers.createFilterStatementWord(
+                //                 filter.col,
+                //                 filter.val,
+                //                 true
+                //             );
+                //     }
+                // }
+            }
+
+            if (add_to_list) {
+                filter_list = mapsToFilter(vals_per_col, specs_per_col);
+
+                if (message != null) {
+                    for (RequestFilter filter : filter_list) {
                         ColumnData col_data = getColData(filter.col);
 
                         if (
@@ -974,22 +1063,26 @@ public class ClientApp extends Application {
                                     filter.val,
                                     filter.special
                                 );
+                        } else if (col_data.type.equals("DATE")) {
+                            message.message +=
+                                ";;;" +
+                                DataBaseHelpers.createFilterStatementDate(
+                                    filter.col,
+                                    filter.val,
+                                    filter.special
+                                );
                         } else {
                             message.message +=
                                 ";;;" +
                                 DataBaseHelpers.createFilterStatementWord(
                                     filter.col,
                                     filter.val,
-                                    true
+                                    filter.special
                                 );
                         }
                     }
-
-                    filter_list.add(filter);
                 }
-            }
 
-            if (add_to_list) {
                 filters.put(table_name, filter_list);
 
                 loadTable(table_name, message);
@@ -1043,10 +1136,11 @@ public class ClientApp extends Application {
         ColumnData column_data,
         boolean strict
     ) {
+        if (value == null) return false;
+
         String check_val = value.trim();
 
-        if (check_val.equals("NULL") && column_data.nullable) return true;
-
+        if (check_val.equals("NULL")) return column_data.nullable;
         if (check_val.isBlank()) return false;
 
         if (column_data.type.equals("TEXT")) {
@@ -1101,34 +1195,53 @@ public class ClientApp extends Application {
         return false;
     }
 
-    @SuppressWarnings("unchecked")
-    RequestFilter nodeToFilter(Node node) {
-        HBox row = (HBox) node;
+    List<RequestFilter> mapsToFilter(
+        Map<String, List<String>> values,
+        Map<String, List<String>> specials
+    ) {
+        List<RequestFilter> filters = new ArrayList<>();
 
-        ComboBox<String> column_field = (ComboBox<String>) row
-            .getChildren()
-            .get(0);
-
-        String col_name = column_field.getValue();
-
-        Node value_field = row.getChildren().get(1);
-
-        String value;
-        if (value_field instanceof TextField) {
-            value = ((TextField) value_field).getText();
-        } else {
-            value = getKeyFromReplacement(
-                col_name,
-                ((ComboBox<String>) value_field).getValue()
+        for (Map.Entry<String, List<String>> entry : values.entrySet()) {
+            RequestFilter filter = new RequestFilter(
+                entry.getKey(),
+                entry.getValue().toArray(new String[0]),
+                specials.get(entry.getKey()).toArray(new String[0])
             );
+
+            filters.add(filter);
         }
 
-        ComboBox<String> special_filed = (ComboBox<String>) row
-            .getChildren()
-            .get(2);
-
-        return new RequestFilter(col_name, value, special_filed.getValue());
+        return filters;
     }
+
+    // @SuppressWarnings("unchecked")
+    // RequestFilter nodeToFilter(Node node) {
+    //     HBox row = (HBox) node;
+
+    //     ComboBox<String> column_field = (ComboBox<String>) row
+    //         .getChildren()
+    //         .get(0);
+
+    //     String col_name = column_field.getValue();
+
+    //     Node value_field = row.getChildren().get(1);
+
+    //     String value;
+    //     if (value_field instanceof TextField) {
+    //         value = ((TextField) value_field).getText();
+    //     } else {
+    //         value = getKeyFromReplacement(
+    //             col_name,
+    //             ((ComboBox<String>) value_field).getValue()
+    //         );
+    //     }
+
+    //     ComboBox<String> special_filed = (ComboBox<String>) row
+    //         .getChildren()
+    //         .get(2);
+
+    //     return new RequestFilter(col_name, value, special_filed.getValue());
+    // }
 
     private String getKeyFromReplacement(String col_name, String replacement) {
         for (Map.Entry<String, String> entry : forein_keys

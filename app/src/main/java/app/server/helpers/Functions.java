@@ -1,4 +1,4 @@
-package app.client.helpers;
+package app.server.helpers;
 
 import java.security.MessageDigest;
 import java.util.HexFormat;

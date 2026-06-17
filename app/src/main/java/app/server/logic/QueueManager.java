@@ -9,8 +9,8 @@ public class QueueManager {
         new LinkedBlockingQueue<>();
     public LinkedBlockingQueue<AppContext<Message>> processor_queue =
         new LinkedBlockingQueue<>();
-    public LinkedBlockingQueue<NeworkPair<Message>> encrypt_queue =
+    public LinkedBlockingQueue<NetworkPair<Message>> encrypt_queue =
         new LinkedBlockingQueue<>();
-    public LinkedBlockingQueue<NeworkPair<byte[]>> sender_queue =
+    public LinkedBlockingQueue<NetworkPair<byte[]>> sender_queue =
         new LinkedBlockingQueue<>();
 }

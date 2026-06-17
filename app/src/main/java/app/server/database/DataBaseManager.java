@@ -274,11 +274,20 @@ public class DataBaseManager {
         return sql;
     }
 
-    public static String createDeleteStatement(String table, String[] keys) {
+    public static String createDeleteStatement(
+        String table,
+        GenericObject object
+    ) {
+        String keys[] = object.getPrimaryKeys();
+
         String sql = "delete from \"" + table + "\" where 1=1"; // + object.primary_key + " = ?"
 
         for (String key : keys) {
-            sql += " and " + key + "=?";
+            if (object.getMap().get(key).equals("NULL")) {
+                sql += " and " + key + " is null";
+            } else {
+                sql += " and " + key + "=?";
+            }
         }
 
         return sql;

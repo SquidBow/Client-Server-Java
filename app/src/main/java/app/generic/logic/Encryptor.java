@@ -3,7 +3,7 @@ package app.generic.logic;
 import app.generic.helpers.Crc16;
 import app.generic.helpers.Message;
 import app.generic.helpers.NetContext;
-import app.generic.helpers.NeworkPair;
+import app.generic.helpers.NetworkPair;
 import app.generic.interfaces.IEncryptor;
 import app.server.logic.QueueManager;
 import java.nio.ByteBuffer;
@@ -24,11 +24,11 @@ public class Encryptor implements IEncryptor, Runnable {
     public void run() {
         try {
             while (true) {
-                NeworkPair<Message> in = queueManager.encrypt_queue.take();
+                NetworkPair<Message> in = queueManager.encrypt_queue.take();
                 this.context = in.context;
                 byte[] encrypted = encrypt(in.data);
                 queueManager.sender_queue.put(
-                    new NeworkPair<>(encrypted, context)
+                    new NetworkPair<>(encrypted, context)
                 );
             }
         } catch (InterruptedException e) {

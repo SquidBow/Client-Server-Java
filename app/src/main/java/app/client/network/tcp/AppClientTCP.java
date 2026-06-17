@@ -1,5 +1,6 @@
 package app.client.network.tcp;
 
+import app.client.interfaces.IAppClient;
 import app.generic.helpers.Message;
 import app.generic.logic.Decryptor;
 import app.generic.logic.Encryptor;
@@ -9,13 +10,13 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 
-public class ActualClient {
+public class AppClientTCP implements IAppClient {
 
     private static Socket socket = null;
     private static InputStream in;
     private static OutputStream out;
 
-    public ActualClient(String host, int port) throws IOException {
+    public AppClientTCP(String host, int port) throws IOException {
         int retries = 5;
 
         while (socket == null) {
@@ -43,8 +44,6 @@ public class ActualClient {
     public Message sendRequest(Message request) throws Exception {
         Encryptor encryptor = new Encryptor();
         byte[] packet = encryptor.encrypt(request);
-
-        // System.out.println("Bytes sent: " + packet.length);
 
         out.write(packet);
         out.flush();

@@ -1,9 +1,7 @@
 package app.client.app;
 
-import static app.client.helpers.Functions.*;
-
 import app.client.helpers.ClientInfo;
-import app.client.network.tcp.ActualClient;
+import app.client.interfaces.IAppClient;
 import app.generic.helpers.Message;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -14,7 +12,7 @@ import javafx.stage.Stage;
 
 public class LoginPage {
 
-    public static ClientInfo showLoginPage(ActualClient actual_client)
+    public static ClientInfo showLoginPage(IAppClient app_client)
         throws Exception {
         TextField empl_name = new TextField();
         empl_name.setPromptText("Enter your name");
@@ -31,7 +29,7 @@ public class LoginPage {
         login.setOnAction(e -> {
             try {
                 client_info[0] = sendRequest(
-                    actual_client,
+                    app_client,
                     empl_name.getText(),
                     empl_surname.getText(),
                     password.getText()
@@ -53,20 +51,21 @@ public class LoginPage {
     }
 
     public static ClientInfo sendRequest(
-        ActualClient actual_client,
+        IAppClient app_client,
         String empl_name,
         String empl_surname,
         String password
     ) throws Exception {
-        String encrypted_password = hashPassword(password);
+        // String encrypted_password = hashPassword(password);
 
         Message request = new Message(
             0,
             0,
-            empl_name + " " + empl_surname + "%%%" + encrypted_password
+            // empl_name + " " + empl_surname + "%%%" + encrypted_password
+            empl_name + " " + empl_surname + "%%%" + password
         );
 
-        Message responce = actual_client.sendRequest(request);
+        Message responce = app_client.sendRequest(request);
 
         if (responce.message.equals("Failed auth")) return null;
 
