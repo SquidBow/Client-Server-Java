@@ -2,6 +2,7 @@ package app;
 
 import static app.generic.helpers.Globals.*;
 
+import app.generic.helpers.Globals;
 import app.generic.logic.Decryptor;
 import app.generic.logic.Encryptor;
 import app.server.logic.*;
@@ -34,7 +35,7 @@ public class Main {
             new Thread(new Decryptor(queue_manager))
         );
         for (int i = 0; i < numProcessors; i++) threads.add(
-            new Thread(new Processor(queue_manager, "storage.db"))
+            new Thread(new Processor(queue_manager, Globals.db_name))
         );
         for (int i = 0; i < numEncryptors; i++) threads.add(
             new Thread(new Encryptor(queue_manager))

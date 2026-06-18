@@ -2,6 +2,7 @@
 package app.server.network.udp;
 
 import app.generic.helpers.AppContext;
+import app.generic.helpers.Globals;
 import app.generic.helpers.Message;
 import app.generic.helpers.NetContext;
 import app.generic.helpers.NetworkPair;
@@ -42,28 +43,30 @@ public class StoreServerUDP extends Thread {
                 try {
                     NetworkPair<byte[]> send = queue.sender_queue.take();
                     // Check if TCP responce cause AI said it is important
-                    if (send.context.address == null) {
+                    if (
+                        send.context.address == null ||
+                        send.context.exchange != null
+                    ) {
                         queue.sender_queue.put(send);
                         Thread.sleep(10);
-                        continue;
+                    } else {
+                        socket.send(
+                            new DatagramPacket(
+                                send.data,
+                                0,
+                                send.data.length,
+                                send.context.address,
+                                send.context.port
+                            )
+                        );
+
+                        // System.out.println(
+                        //     "Sent response to " +
+                        //         send.context.address +
+                        //         ":" +
+                        //         send.context.port
+                        // );
                     }
-
-                    socket.send(
-                        new DatagramPacket(
-                            send.data,
-                            0,
-                            send.data.length,
-                            send.context.address,
-                            send.context.port
-                        )
-                    );
-
-                    // System.out.println(
-                    //     "Sent response to " +
-                    //         send.context.address +
-                    //         ":" +
-                    //         send.context.port
-                    // );
                 } catch (InterruptedException | IOException e) {
                     e.printStackTrace();
                 }
@@ -155,7 +158,7 @@ public class StoreServerUDP extends Thread {
 
                 String auth_status = new Processor(
                     null,
-                    "storage.db"
+                    Globals.db_name
                 ).handleLogin(parts[0], Functions.hashPassword(parts[1]));
 
                 queue.encrypt_queue.put(

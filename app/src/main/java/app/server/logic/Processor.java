@@ -665,13 +665,14 @@ public class Processor implements app.server.interfaces.IProcessor, Runnable {
                 keys +=
                     ":::" +
                     getKeyReplace(rs.getString("table"), rs.getString("from"));
-                System.out.println(
-                    rs.getString("from") +
-                        " -> " +
-                        rs.getString("to") +
-                        " at " +
-                        rs.getString("table")
-                );
+
+                // System.out.println(
+                //     rs.getString("from") +
+                //         " -> " +
+                //         rs.getString("to") +
+                //         " at " +
+                //         rs.getString("table")
+                // );
             }
         }
 

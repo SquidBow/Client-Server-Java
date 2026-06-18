@@ -28,13 +28,15 @@ public class StoreServerTCP extends Thread {
                 try {
                     NetworkPair<byte[]> send = queue.sender_queue.take();
 
-                    if (send.context.address != null) {
+                    if (
+                        send.context.address != null ||
+                        send.context.exchange != null
+                    ) {
                         queue.sender_queue.put(send);
                         Thread.sleep(10);
-                        continue;
+                    } else {
+                        send.context.socket.getOutputStream().write(send.data);
                     }
-
-                    send.context.socket.getOutputStream().write(send.data);
                 } catch (InterruptedException | IOException e) {
                     e.printStackTrace();
                 }
@@ -117,7 +119,7 @@ public class StoreServerTCP extends Thread {
     private String getAuth(InputStream in, NetContext context) {
         String auth_status = "Failed auth";
 
-        Processor processor = new Processor(null, "storage.db");
+        Processor processor = new Processor(null, Globals.db_name);
 
         try {
             while (auth_status.equals("Failed auth")) {
