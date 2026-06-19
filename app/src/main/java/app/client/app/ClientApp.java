@@ -66,9 +66,9 @@ public class ClientApp extends Application {
     public void start(Stage primary_stage) {
         try {
             if (network_implementation.equals("udp")) {
-                app_client = new AppClientUDP(host, port);
+                app_client = new AppClientUDP();
             } else {
-                app_client = new AppClientTCP(host, port);
+                app_client = new AppClientTCP();
             }
 
             if (DEBUG) {

@@ -1,6 +1,7 @@
 package app.client.network.udp;
 
 import app.client.interfaces.IAppClient;
+import app.generic.helpers.Globals;
 import app.generic.helpers.Message;
 import app.generic.logic.Decryptor;
 import app.generic.logic.Encryptor;
@@ -14,14 +15,11 @@ import java.net.UnknownHostException;
 public class AppClientUDP implements IAppClient {
 
     InetAddress address;
-    int port;
     DatagramSocket socket;
 
-    public AppClientUDP(String host, int port) {
-        this.port = port;
-
+    public AppClientUDP() {
         try {
-            this.address = InetAddress.getByName(host);
+            this.address = InetAddress.getByName(Globals.host);
             socket = new DatagramSocket();
         } catch (UnknownHostException | SocketException e) {
             e.printStackTrace();
@@ -36,7 +34,7 @@ public class AppClientUDP implements IAppClient {
             encrypted_message,
             encrypted_message.length,
             address,
-            port
+            Globals.port
         );
 
         byte[] buffer = new byte[1024];

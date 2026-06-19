@@ -3,6 +3,8 @@ package app.server.helpers;
 import app.generic.helpers.Tuple;
 import com.auth0.jwt.*;
 import com.auth0.jwt.algorithms.Algorithm;
+import com.auth0.jwt.exceptions.JWTVerificationException;
+import com.auth0.jwt.interfaces.DecodedJWT;
 import java.time.Instant;
 
 public class JWTToken {
@@ -22,5 +24,27 @@ public class JWTToken {
         token.withExpiresAt(Instant.now().plusSeconds(300));
 
         return token.sign(algorithm);
+    }
+
+    public static String decodeToken(String token, String claim) {
+        if (token == null || token.isBlank()) {
+            return "401";
+        }
+
+        try {
+            Algorithm alg = Algorithm.HMAC256(
+                "secret_key_do_not_tell_anyone_or_you_will_be_fired_key_is_very_secure_and_very_long_and_very_long_is_very_secure_!!!!!!!!!!!!!"
+            );
+
+            DecodedJWT decoded = JWT.require(alg).build().verify(token);
+
+            return decoded.getClaim(claim).asString();
+        } catch (JWTVerificationException e) {
+            e.printStackTrace();
+            return "Expired token";
+        }
+        // } catch (JWTDecodeException e) {
+        //     e.printStackTrace();
+        //     return "401";
     }
 }

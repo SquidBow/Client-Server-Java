@@ -1,6 +1,7 @@
 package app.client.network.tcp;
 
 import app.client.interfaces.IAppClient;
+import app.generic.helpers.Globals;
 import app.generic.helpers.Message;
 import app.generic.logic.Decryptor;
 import app.generic.logic.Encryptor;
@@ -16,12 +17,12 @@ public class AppClientTCP implements IAppClient {
     private static InputStream in;
     private static OutputStream out;
 
-    public AppClientTCP(String host, int port) throws IOException {
+    public AppClientTCP() throws IOException {
         int retries = 5;
 
         while (socket == null) {
             try {
-                socket = new Socket(host, port);
+                socket = new Socket(Globals.host, Globals.port);
             } catch (IOException e) {
                 if (retries > 0) {
                     System.out.println("Unable to connect retrying");
@@ -62,7 +63,6 @@ public class AppClientTCP implements IAppClient {
         System.arraycopy(header, 0, fullPacket, 0, 16);
         System.arraycopy(body, 0, fullPacket, 16, length);
 
-        Decryptor decryptor = new Decryptor(null);
-        return decryptor.getDecryptedMessage(fullPacket);
+        return new Decryptor().getDecryptedMessage(fullPacket);
     }
 }

@@ -12,3 +12,5 @@ target/
 Thumbs.db
 
 storage.db
+
+src/main/java/app/server/network/http/CustomHttpServerWithAuth.java

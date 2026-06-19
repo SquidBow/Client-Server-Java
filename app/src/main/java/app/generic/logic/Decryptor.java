@@ -36,7 +36,7 @@ public class Decryptor implements IDecryptor, Runnable {
         }
     }
 
-    String decryptInnerMessage(byte[] bytes) {
+    String decryptInnerMessage(byte[] bytes) throws RuntimeException {
         try {
             SecretKeySpec key = new SecretKeySpec(
                 "1234567890123456".getBytes(),
@@ -122,7 +122,8 @@ public class Decryptor implements IDecryptor, Runnable {
         // return full_message;
     }
 
-    public Message getDecryptedMessage(byte[] message) {
+    public Message getDecryptedMessage(byte[] message)
+        throws IllegalArgumentException {
         if (message.length < 26) {
             throw new IllegalArgumentException("Unable to decrypt message");
         }
