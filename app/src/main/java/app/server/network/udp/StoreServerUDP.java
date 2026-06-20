@@ -22,17 +22,16 @@ public class StoreServerUDP extends Thread {
     public static int MAX_THREADS = 1;
     private Semaphore semaphore = new Semaphore(MAX_THREADS);
     QueueManager queue;
-    int port;
     DatagramSocket socket;
 
     //User, role
     Map<String, String> user_role = new HashMap<>();
 
-    public StoreServerUDP(QueueManager queue, int port) {
+    public StoreServerUDP(QueueManager queue) {
         this.queue = queue;
-        this.port = port;
+
         try {
-            socket = new DatagramSocket(port);
+            socket = new DatagramSocket(Globals.port);
         } catch (IOException e) {
             e.printStackTrace();
             System.out.println("Error while reading/writing socket");

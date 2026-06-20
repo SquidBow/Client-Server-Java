@@ -17,11 +17,9 @@ public class StoreServerTCP extends Thread {
     private Semaphore semaphore = new Semaphore(MAX_THREADS);
 
     QueueManager queue;
-    int port;
 
-    public StoreServerTCP(QueueManager queue, int port) {
+    public StoreServerTCP(QueueManager queue) {
         this.queue = queue;
-        this.port = port;
 
         new Thread(() -> {
             while (true) {
@@ -48,7 +46,7 @@ public class StoreServerTCP extends Thread {
 
     public void run() {
         //If I will ever have more then like 6 clients do this and not phisical threads
-        // try (ServerSocket s = new ServerSocket(port)) {
+        // try (ServerSocket s = new ServerSocket(Globals.port)) {
         //     while (true) {
         //         Socket socket = s.accept();
 
@@ -59,7 +57,7 @@ public class StoreServerTCP extends Thread {
         // }
 
         //For 0/1 client(s)
-        try (ServerSocket s = new ServerSocket(port)) {
+        try (ServerSocket s = new ServerSocket(Globals.port)) {
             while (true) {
                 Socket socket = s.accept();
 

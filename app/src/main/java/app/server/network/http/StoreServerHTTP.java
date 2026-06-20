@@ -48,6 +48,8 @@ public class StoreServerHTTP extends Thread {
                         send.context.address == null &&
                         send.context.socket == null
                     ) {
+                        System.out.println("\nSending responce back");
+
                         HttpExchange exchange = send.context.exchange;
                         exchange
                             .getResponseHeaders()
@@ -79,7 +81,10 @@ public class StoreServerHTTP extends Thread {
 
     public void run() {
         createLoginContext();
-        createTablesContext();
+        for (String table : tables) {
+            createTableContext(table);
+        }
+        createTableContext("special");
 
         server.start();
     }
@@ -125,10 +130,7 @@ public class StoreServerHTTP extends Thread {
                                 login_message.command_id,
                                 login_message.user_id,
                                 JWTToken.createToken(
-                                    new Tuple<>(
-                                        "user_role",
-                                        auth.split("%%%")[1]
-                                    )
+                                    new Tuple<>("user_info", auth)
                                 )
                             )
                         )
@@ -140,40 +142,62 @@ public class StoreServerHTTP extends Thread {
         });
     }
 
-    private void createTablesContext() {
-        for (String table : tables) {
-            server.createContext("/" + table + "/", exchange -> {
-                //verify the token
-                String header = exchange
-                    .getRequestHeaders()
-                    .getFirst("Authorization");
+    private void createTableContext(String table_name) {
+        System.out.println();
+        server.createContext("/" + table_name + "/", exchange -> {
+            //verify the token
+            String header = exchange
+                .getRequestHeaders()
+                .getFirst("Authorization");
 
-                String user_role = JWTToken.decodeToken(header, "user_role");
+            // System.out.println("\nDecoding token");
+            String user_role = JWTToken.decodeToken(header, "user_info");
+            // System.out.println("\nFinished decoding token");
 
-                if (user_role.equals("401")) {
-                    writeFail(exchange, "Invalid token");
-                    return;
-                } else if (user_role.equals("Expired token")) {
-                    writeFail(exchange, "Expired token");
-                }
+            // if (user_role == null) {
+            //     System.out.println("\nRole is null");
+            // }
 
-                //These will come from the token
-                byte[] data = new byte[0];
+            if (user_role.equals("401")) {
+                // System.out.println("\nInvalid token");
+                writeFail(exchange, "Invalid token");
+                return;
+            } else if (user_role.equals("Expired token")) {
+                // System.out.println("\nExpired token");
+                writeFail(exchange, "Expired token");
+            } else {
+                user_role = user_role.split("%%%")[1];
+                System.out.println("\nUser role is: " + user_role);
+            }
 
-                try {
-                    queue.decrypt_queue.put(
-                        new AppContext<byte[]>(
-                            data,
-                            user_role,
-                            new NetContext(exchange)
-                        )
-                    );
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                    writeFail(exchange, e);
-                }
-            });
-        }
+            String path = exchange.getRequestURI().toString();
+
+            System.out.println("\nBuilding message");
+            byte[] data;
+            // String method = exchange.getRequestMethod();
+
+            System.out.println("\n\nGot message: " + path);
+            // if (table_name.equals("special")) {
+            //     String msg = path.substring(table_name.length() + 2);
+
+            //     data = new Encryptor().encrypt(new Message(5, 0, msg));
+            // } else {
+            data = exchange.getRequestBody().readAllBytes();
+            // }
+
+            try {
+                queue.decrypt_queue.put(
+                    new AppContext<byte[]>(
+                        data,
+                        user_role,
+                        new NetContext(exchange)
+                    )
+                );
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                writeFail(exchange, e);
+            }
+        });
     }
 
     private void writeFail(HttpExchange exchange, Exception e)
@@ -188,7 +212,7 @@ public class StoreServerHTTP extends Thread {
 
     private void writeResponce(HttpExchange exchange, int code, byte[] responce)
         throws IOException {
-        exchange.getResponseHeaders().add("Content-Type", "application/json");
+        exchange.getResponseHeaders().add("Content-Type", "application/string");
 
         exchange.sendResponseHeaders(code, responce.length);
 

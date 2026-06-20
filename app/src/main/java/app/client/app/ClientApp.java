@@ -7,6 +7,7 @@ import app.client.helpers.ColumnData;
 import app.client.helpers.DataBaseHelpers;
 import app.client.helpers.RequestFilter;
 import app.client.interfaces.IAppClient;
+import app.client.network.http.AppClientHTTP;
 import app.client.network.tcp.AppClientTCP;
 import app.client.network.udp.AppClientUDP;
 import app.generic.helpers.*;
@@ -60,13 +61,15 @@ public class ClientApp extends Application {
     private Map<String, Map<String, String>> forein_keys = new HashMap<>();
     IAppClient app_client;
 
-    private boolean DEBUG = false;
+    private boolean DEBUG = true;
 
     @Override
     public void start(Stage primary_stage) {
         try {
             if (network_implementation.equals("udp")) {
                 app_client = new AppClientUDP();
+            } else if (network_implementation.equals("http")) {
+                app_client = new AppClientHTTP();
             } else {
                 app_client = new AppClientTCP();
             }
@@ -346,35 +349,27 @@ public class ClientApp extends Application {
             // System.out.println("\n\n\nRequest: " + message.message + "\n\n\n");
             return app_client.sendRequest(message).message;
         }
-        // else if (table_name.startsWith("(Special)")) {
-        //     // System.out.println("\n\n\nMessage is null\n\n\n");
-        //     String request_id = special_queries.get(table_name);
-        //     return app_client
-        //         .sendRequest(new Message(5, client_info.id, request_id))
-        //         .message;
-        // }
-        else {
-            String[] table_filters = getFiltersForTable(table_name);
 
-            return app_client
-                .sendRequest(
-                    new Message(
-                        1,
-                        client_info.id,
-                        DataBaseHelpers.encodeDBContext(
-                            new DBContext(
-                                table_name,
-                                table_filters,
-                                1000,
-                                0,
-                                null,
-                                false
-                            )
+        String[] table_filters = getFiltersForTable(table_name);
+
+        return app_client
+            .sendRequest(
+                new Message(
+                    1,
+                    client_info.id,
+                    DataBaseHelpers.encodeDBContext(
+                        new DBContext(
+                            table_name,
+                            table_filters,
+                            1000,
+                            0,
+                            null,
+                            false
                         )
                     )
                 )
-                .message;
-        }
+            )
+            .message;
     }
 
     private String[] parseColumns(String str) {
