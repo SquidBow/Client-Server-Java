@@ -6,6 +6,7 @@ import app.generic.helpers.Message;
 import app.generic.helpers.NetContext;
 import app.generic.helpers.NetworkPair;
 import app.generic.helpers.Tuple;
+import app.generic.logic.Decryptor;
 import app.generic.logic.Encryptor;
 import app.server.helpers.Functions;
 import app.server.helpers.JWTToken;
@@ -95,9 +96,14 @@ public class StoreServerHTTP extends Thread {
 
     private void createLoginContext() {
         server.createContext("/login", exchange -> {
-            String body = new String(exchange.getRequestBody().readAllBytes());
+            byte[] body = exchange.getRequestBody().readAllBytes();
 
-            Map<String, String> parts = mapper.readValue(body, Map.class);
+            Message decrypted_body = new Decryptor().getDecryptedMessage(body);
+
+            Map<String, String> parts = mapper.readValue(
+                decrypted_body.message,
+                Map.class
+            );
 
             String login = parts.get("login");
             String password = parts.get("password");

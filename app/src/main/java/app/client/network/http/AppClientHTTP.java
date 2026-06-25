@@ -46,20 +46,21 @@ public class AppClientHTTP implements IAppClient {
             return null;
         }
 
-        // byte[] encrypted_credentials = new Encryptor().encrypt(message);
+        String json =
+            "{\"login\": \"" +
+            parts[0] +
+            "\", \"password\": \"" +
+            parts[1] +
+            "\"}";
+
+        byte[] encrypted_credentials = new Encryptor().encrypt(
+            new Message(message.command_id, message.user_id, json)
+        );
         // .POST(HttpRequest.BodyPublishers.ofByteArray(encrypted_credentials))
 
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(start_url + "login"))
-            .POST(
-                HttpRequest.BodyPublishers.ofString(
-                    "{\"login\": \"" +
-                        parts[0] +
-                        "\", \"password\": \"" +
-                        parts[1] +
-                        "\"}"
-                )
-            )
+            .POST(HttpRequest.BodyPublishers.ofByteArray(encrypted_credentials))
 
             .build();
 

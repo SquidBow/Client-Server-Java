@@ -61,7 +61,7 @@ public class ClientApp extends Application {
     private Map<String, Map<String, String>> forein_keys = new HashMap<>();
     IAppClient app_client;
 
-    private boolean DEBUG = true;
+    private boolean DEBUG = false;
 
     @Override
     public void start(Stage primary_stage) {
