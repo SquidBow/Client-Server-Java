@@ -38,39 +38,9 @@ public class StoreServerUDP extends Thread {
         }
 
         new Thread(() -> {
-            while (true) {
-                try {
-                    NetworkPair<byte[]> send = queue.sender_queue.take();
-                    // Check if TCP responce cause AI said it is important
-                    if (
-                        send.context.address == null ||
-                        send.context.exchange != null
-                    ) {
-                        queue.sender_queue.put(send);
-                        Thread.sleep(10);
-                    } else {
-                        socket.send(
-                            new DatagramPacket(
-                                send.data,
-                                0,
-                                send.data.length,
-                                send.context.address,
-                                send.context.port
-                            )
-                        );
-
-                        // System.out.println(
-                        //     "Sent response to " +
-                        //         send.context.address +
-                        //         ":" +
-                        //         send.context.port
-                        // );
-                    }
-                } catch (InterruptedException | IOException e) {
-                    e.printStackTrace();
-                }
-            }
+            sender();
         }).start();
+
         start();
     }
 
@@ -215,5 +185,40 @@ public class StoreServerUDP extends Thread {
         }
 
         return new Decryptor().getDecryptedMessage(data);
+    }
+
+    private void sender() {
+        while (true) {
+            try {
+                NetworkPair<byte[]> send = queue.sender_queue.take();
+                // Check if TCP responce cause AI said it is important
+                if (
+                    send.context.address == null ||
+                    send.context.exchange != null
+                ) {
+                    queue.sender_queue.put(send);
+                    Thread.sleep(10);
+                } else {
+                    socket.send(
+                        new DatagramPacket(
+                            send.data,
+                            0,
+                            send.data.length,
+                            send.context.address,
+                            send.context.port
+                        )
+                    );
+
+                    // System.out.println(
+                    //     "Sent response to " +
+                    //         send.context.address +
+                    //         ":" +
+                    //         send.context.port
+                    // );
+                }
+            } catch (InterruptedException | IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 }

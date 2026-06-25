@@ -6,7 +6,6 @@ import app.generic.helpers.Message;
 import app.generic.helpers.NetContext;
 import app.generic.helpers.NetworkPair;
 import app.generic.helpers.Tuple;
-import app.generic.logic.Decryptor;
 import app.generic.logic.Encryptor;
 import app.server.helpers.Functions;
 import app.server.helpers.JWTToken;
@@ -40,36 +39,36 @@ public class StoreServerHTTP extends Thread {
     public StoreServerHTTP(QueueManager queue) {
         this.queue = queue;
 
-        new Thread(() -> {
-            while (true) {
-                try {
-                    NetworkPair<byte[]> send = queue.sender_queue.take();
+        // new Thread(() -> {
+        //     while (true) {
+        //         try {
+        //             NetworkPair<byte[]> send = queue.sender_queue.take();
 
-                    if (
-                        send.context.address == null &&
-                        send.context.socket == null
-                    ) {
-                        // System.out.println("\nSending responce back");
+        //             if (
+        //                 send.context.address == null &&
+        //                 send.context.socket == null
+        //             ) {
+        //                 // System.out.println("\nSending responce back");
 
-                        HttpExchange exchange = send.context.exchange;
-                        exchange
-                            .getResponseHeaders()
-                            .add("Content-Type", "application/byte[]");
+        //                 HttpExchange exchange = send.context.exchange;
+        //                 exchange
+        //                     .getResponseHeaders()
+        //                     .add("Content-Type", "application/byte[]");
 
-                        exchange.sendResponseHeaders(200, send.data.length);
+        //                 exchange.sendResponseHeaders(200, send.data.length);
 
-                        try (OutputStream os = exchange.getResponseBody()) {
-                            os.write(send.data);
-                        }
-                    } else {
-                        queue.sender_queue.put(send);
-                        Thread.sleep(10);
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        }).start();
+        //                 try (OutputStream os = exchange.getResponseBody()) {
+        //                     os.write(send.data);
+        //                 }
+        //             } else {
+        //                 queue.sender_queue.put(send);
+        //                 Thread.sleep(10);
+        //             }
+        //         } catch (Exception e) {
+        //             e.printStackTrace();
+        //         }
+        //     }
+        // }).start();
 
         try {
             server = HttpServer.create(new InetSocketAddress(Globals.port), 0);

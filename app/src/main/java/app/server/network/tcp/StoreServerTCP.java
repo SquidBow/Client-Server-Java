@@ -21,25 +21,25 @@ public class StoreServerTCP extends Thread {
     public StoreServerTCP(QueueManager queue) {
         this.queue = queue;
 
-        new Thread(() -> {
-            while (true) {
-                try {
-                    NetworkPair<byte[]> send = queue.sender_queue.take();
+        // new Thread(() -> {
+        //     while (true) {
+        //         try {
+        //             NetworkPair<byte[]> send = queue.sender_queue.take();
 
-                    if (
-                        send.context.address != null ||
-                        send.context.exchange != null
-                    ) {
-                        queue.sender_queue.put(send);
-                        Thread.sleep(10);
-                    } else {
-                        send.context.socket.getOutputStream().write(send.data);
-                    }
-                } catch (InterruptedException | IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }).start();
+        //             if (
+        //                 send.context.address != null ||
+        //                 send.context.exchange != null
+        //             ) {
+        //                 queue.sender_queue.put(send);
+        //                 Thread.sleep(10);
+        //             } else {
+        //                 send.context.socket.getOutputStream().write(send.data);
+        //             }
+        //         } catch (InterruptedException | IOException e) {
+        //             e.printStackTrace();
+        //         }
+        //     }
+        // }).start();
 
         start();
     }

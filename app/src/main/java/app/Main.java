@@ -6,7 +6,9 @@ import app.generic.helpers.Globals;
 import app.generic.logic.Decryptor;
 import app.generic.logic.Encryptor;
 import app.server.logic.*;
+import app.server.network.http.SenderHTTP;
 import app.server.network.http.StoreServerHTTP;
+import app.server.network.tcp.SenderTCP;
 import app.server.network.tcp.StoreServerTCP;
 import app.server.network.udp.StoreServerUDP;
 import java.util.ArrayList;
@@ -28,12 +30,12 @@ public class Main {
             new StoreServerUDP(queue_manager);
         } else if (network_implementation.equals("http")) {
             new StoreServerHTTP(queue_manager);
+            new SenderHTTP(queue_manager);
         } else {
             new StoreServerTCP(queue_manager);
+            new SenderTCP(queue_manager);
         }
 
-        // for (int i = 0; i < numReceivers; i++) threads.add(
-        // );
         for (int i = 0; i < numDecryptors; i++) threads.add(
             new Thread(new Decryptor(queue_manager))
         );
