@@ -39,11 +39,28 @@ public class AppClientHTTP implements IAppClient {
         throws IOException, InterruptedException {
         credentials = message;
 
-        byte[] encrypted_credentials = new Encryptor().encrypt(message);
+        String[] parts = message.message.split("%%%");
+        if (parts.length < 2) {
+            //Some error
+
+            return null;
+        }
+
+        // byte[] encrypted_credentials = new Encryptor().encrypt(message);
+        // .POST(HttpRequest.BodyPublishers.ofByteArray(encrypted_credentials))
 
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(start_url + "login/"))
-            .POST(HttpRequest.BodyPublishers.ofByteArray(encrypted_credentials))
+            .uri(URI.create(start_url + "login"))
+            .POST(
+                HttpRequest.BodyPublishers.ofString(
+                    "{\"login\": \"" +
+                        parts[0] +
+                        "\", \"password\": \"" +
+                        parts[1] +
+                        "\"}"
+                )
+            )
+
             .build();
 
         HttpResponse<byte[]> responce = client.send(

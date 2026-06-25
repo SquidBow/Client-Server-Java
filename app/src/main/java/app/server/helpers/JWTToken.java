@@ -28,7 +28,7 @@ public class JWTToken {
 
     public static String decodeToken(String token, String claim) {
         if (token == null || token.isBlank()) {
-            System.out.println("\nDecodning: Got 401 ");
+            // System.out.println("\nDecodning: Got 401 ");
             return "401";
         }
 
@@ -37,13 +37,13 @@ public class JWTToken {
                 "secret_key_do_not_tell_anyone_or_you_will_be_fired_key_is_very_secure_and_very_long_and_very_long_is_very_secure_!!!!!!!!!!!!!"
             );
 
-            System.out.println("Decoding: verifying token");
+            // System.out.println("Decoding: verifying token");
             DecodedJWT decoded = JWT.require(alg).build().verify(token);
 
-            System.out.println("Decoding: Returning token");
+            // System.out.println("Decoding: Returning token");
             return decoded.getClaim(claim).asString();
         } catch (JWTVerificationException e) {
-            System.out.println("Decoding: failed to decode it");
+            // System.out.println("Decoding: failed to decode it");
             e.printStackTrace();
             return "Expired token";
         }

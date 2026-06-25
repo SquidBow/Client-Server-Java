@@ -18,6 +18,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.util.Map;
 
 public class StoreServerHTTP extends Thread {
 
@@ -48,7 +49,7 @@ public class StoreServerHTTP extends Thread {
                         send.context.address == null &&
                         send.context.socket == null
                     ) {
-                        System.out.println("\nSending responce back");
+                        // System.out.println("\nSending responce back");
 
                         HttpExchange exchange = send.context.exchange;
                         exchange
@@ -94,27 +95,22 @@ public class StoreServerHTTP extends Thread {
     }
 
     private void createLoginContext() {
-        server.createContext("/login/", exchange -> {
-            Decryptor decryptor = new Decryptor();
-            Processor processor = new Processor(null, Globals.db_name);
+        server.createContext("/login", exchange -> {
+            String body = new String(exchange.getRequestBody().readAllBytes());
 
-            byte[] encrypted_login = exchange.getRequestBody().readAllBytes();
+            Map<String, String> parts = mapper.readValue(body, Map.class);
 
-            Message login_message;
+            String login = parts.get("login");
+            String password = parts.get("password");
 
-            try {
-                login_message = decryptor.getDecryptedMessage(encrypted_login);
-            } catch (Exception e) {
-                writeFail(exchange, e);
-                return;
+            if (login == null || password == null) {
+                writeFail(exchange, "Invalid login");
             }
 
             try {
-                String auth = processor.handleLogin(
-                    login_message.message.split("%%%")[0],
-                    Functions.hashPassword(
-                        login_message.message.split("%%%")[1]
-                    )
+                String auth = new Processor(null, Globals.db_name).handleLogin(
+                    login,
+                    Functions.hashPassword(password)
                 );
 
                 Encryptor encryptor = new Encryptor();
@@ -127,8 +123,8 @@ public class StoreServerHTTP extends Thread {
                         200,
                         encryptor.encrypt(
                             new Message(
-                                login_message.command_id,
-                                login_message.user_id,
+                                0,
+                                0,
                                 JWTToken.createToken(
                                     new Tuple<>("user_info", auth)
                                 )
@@ -167,23 +163,15 @@ public class StoreServerHTTP extends Thread {
                 writeFail(exchange, "Expired token");
             } else {
                 user_role = user_role.split("%%%")[1];
-                System.out.println("\nUser role is: " + user_role);
+                // System.out.println("\nUser role is: " + user_role);
             }
 
-            String path = exchange.getRequestURI().toString();
-
-            System.out.println("\nBuilding message");
+            // System.out.println("\nBuilding message");
             byte[] data;
-            // String method = exchange.getRequestMethod();
 
-            System.out.println("\n\nGot message: " + path);
-            // if (table_name.equals("special")) {
-            //     String msg = path.substring(table_name.length() + 2);
-
-            //     data = new Encryptor().encrypt(new Message(5, 0, msg));
-            // } else {
+            // String path = exchange.getRequestURI().toString();
+            // System.out.println("\n\nGot message: " + path);
             data = exchange.getRequestBody().readAllBytes();
-            // }
 
             try {
                 queue.decrypt_queue.put(
